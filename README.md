@@ -2,7 +2,7 @@
 
 CLI for [NeuralRepo](https://neuralrepo.com) — AI-native idea capture and management.
 
-Capture ideas, search semantically, organize with tags and statuses, link related ideas, and pull context for development — all from the terminal. Designed to compose with unix pipes and tools like `jq`.
+Capture ideas, search semantically, organize with tags and statuses, link related ideas, and pull context for development — all from the terminal. Commands mirror git vocabulary (`push`, `log`, `diff`, `branch`, `merge`, `tag`, `stash`) for familiarity to both humans and LLMs. Designed to compose with unix pipes and tools like `jq`.
 
 ## Install
 
