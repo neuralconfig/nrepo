@@ -1329,7 +1329,7 @@ async function graphCommand(id, opts) {
 
 // src/index.ts
 var program = new Command();
-program.name("nrepo").description("NeuralRepo \u2014 capture and manage ideas from the terminal").version("0.0.1");
+program.name("nrepo").description("NeuralRepo \u2014 capture and manage ideas from the terminal").version("0.0.2");
 program.command("login").description("Authenticate with NeuralRepo").option("--api-key", "Login with an API key instead of browser OAuth").action(wrap(loginCommand));
 program.command("logout").description("Clear stored credentials").action(wrap(async () => {
   await clearConfig();
