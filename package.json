@@ -1,10 +1,10 @@
 {
   "name": "@neuralconfig/nrepo",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "NeuralRepo CLI — capture and manage ideas from the terminal",
   "type": "module",
   "bin": {
-    "nrepo": "./dist/index.js"
+    "nrepo": "dist/index.js"
   },
   "files": [
     "dist",
@@ -28,7 +28,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@neuralrepo/shared": "*",
+    "@neuralrepo/shared": "file:./packages/shared",
     "@types/node": "^25.5.0",
     "tsup": "^8.4.0",
     "typescript": "^5.9.3"
@@ -48,6 +48,6 @@
   "bugs": "https://github.com/neuralconfig/nrepo/issues",
   "repository": {
     "type": "git",
-    "url": "https://github.com/neuralconfig/nrepo"
+    "url": "git+https://github.com/neuralconfig/nrepo.git"
   }
 }

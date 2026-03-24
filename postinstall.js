@@ -5,16 +5,23 @@ import { homedir } from 'node:os';
 
 try {
   const claudeDir = join(homedir(), '.claude');
-  if (!existsSync(claudeDir)) process.exit(0);
+  if (existsSync(claudeDir)) {
+    const skillDir = join(claudeDir, 'skills', 'neuralrepo');
+    mkdirSync(skillDir, { recursive: true });
 
-  const skillDir = join(claudeDir, 'skills', 'neuralrepo');
-  mkdirSync(skillDir, { recursive: true });
+    const src = join(dirname(fileURLToPath(import.meta.url)), 'skill', 'SKILL.md');
+    const dest = join(skillDir, 'SKILL.md');
+    copyFileSync(src, dest);
 
-  const src = join(dirname(fileURLToPath(import.meta.url)), 'skill', 'SKILL.md');
-  const dest = join(skillDir, 'SKILL.md');
-  copyFileSync(src, dest);
+    console.log('');
+    console.log('  nrepo: Claude Code skill installed');
+  }
 
-  console.log('nrepo: Claude Code skill installed to ~/.claude/skills/neuralrepo/');
+  console.log('');
+  console.log('  Get started:');
+  console.log('    nrepo login       Authenticate with NeuralRepo');
+  console.log('    nrepo --help      See all commands');
+  console.log('');
 } catch {
   // Silent failure — postinstall must not break npm install
 }

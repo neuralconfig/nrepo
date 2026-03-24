@@ -26,7 +26,7 @@ const program = new Command();
 program
   .name('nrepo')
   .description('NeuralRepo — capture and manage ideas from the terminal')
-  .version('0.0.1');
+  .version('0.0.2');
 
 // login
 program
