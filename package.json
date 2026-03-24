@@ -49,5 +49,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/neuralconfig/nrepo.git"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
   }
 }
