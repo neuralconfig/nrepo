@@ -1,0 +1,53 @@
+{
+  "name": "@neuralconfig/nrepo",
+  "version": "0.0.1",
+  "description": "NeuralRepo CLI — capture and manage ideas from the terminal",
+  "type": "module",
+  "bin": {
+    "nrepo": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "skill",
+    "postinstall.js",
+    "preuninstall.js",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "prepublishOnly": "npm run build",
+    "postinstall": "node postinstall.js",
+    "preuninstall": "node preuninstall.js"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "ora": "^8.2.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@neuralrepo/shared": "*",
+    "@types/node": "^25.5.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "neuralrepo",
+    "ideas",
+    "cli",
+    "capture"
+  ],
+  "license": "MIT",
+  "author": "NeuralConfig",
+  "homepage": "https://neuralrepo.com",
+  "bugs": "https://github.com/neuralconfig/nrepo/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/neuralconfig/nrepo"
+  }
+}
