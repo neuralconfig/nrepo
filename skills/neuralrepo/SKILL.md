@@ -40,8 +40,8 @@ nrepo push "New idea title" --body "Details here" --tag backend
 # Full capture with body and tags
 nrepo push "Add rate limiting to API" --body "Use sliding window algorithm, store in KV" --tag backend --tag infrastructure
 
-# Quick capture (no options)
-nrepo stash "Look into edge caching for static assets"
+# Quick capture (title only — body and tags are optional)
+nrepo push "Look into edge caching for static assets"
 ```
 
 ### Search and browse
@@ -173,11 +173,19 @@ nrepo graph 42 --depth 3 --type blocks
 nrepo move shipped --ids 91
 ```
 
-### Identifying duplicates for merge
+### Managing duplicates
 ```bash
-nrepo diff 42 57
-# If they're duplicates, merge them
-nrepo merge 42 57 --force
+nrepo duplicate                  # List pending duplicate detections
+nrepo duplicate dismiss 7        # Dismiss a false positive
+nrepo duplicate merge 7          # Merge duplicate into primary
+nrepo diff 42 57                 # Compare two ideas side-by-side
+nrepo merge 42 57 --force        # Manual merge if needed
+```
+
+### Archiving ideas
+```bash
+nrepo rm 42                      # Archive (soft-delete) an idea
+nrepo rm 42 --force              # Skip confirmation
 ```
 
 ### Building connections from search results

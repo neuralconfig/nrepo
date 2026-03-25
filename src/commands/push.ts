@@ -35,6 +35,3 @@ export async function pushCommand(
   }
 }
 
-export async function stashCommand(title: string, opts: { json?: boolean }): Promise<void> {
-  await pushCommand(title, { json: opts.json });
-}

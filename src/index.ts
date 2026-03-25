@@ -4,7 +4,7 @@ import { AuthError, loadConfig } from './config.js';
 import { ApiError } from './api.js';
 import { loginCommand } from './commands/login.js';
 import { whoamiCommand } from './commands/whoami.js';
-import { pushCommand, stashCommand } from './commands/push.js';
+import { pushCommand } from './commands/push.js';
 import { searchCommand } from './commands/search.js';
 import { logCommand } from './commands/log.js';
 import { statusCommand } from './commands/status.js';
@@ -15,7 +15,9 @@ import { pullCommand } from './commands/pull.js';
 import { diffCommand } from './commands/diff.js';
 import { branchCommand } from './commands/branch.js';
 import { editCommand } from './commands/edit.js';
-import { keysListCommand, keysCreateCommand, keysRevokeCommand } from './commands/keys.js';
+import { keysListCommand, keysCreateCommand, keysRevokeCommand } from './commands/key.js';
+import { rmCommand } from './commands/rm.js';
+import { duplicateListCommand, duplicateDismissCommand, duplicateMergeCommand } from './commands/duplicate.js';
 import { linkCommand, unlinkCommand, linksCommand } from './commands/link.js';
 import { mergeCommand } from './commands/merge.js';
 import { graphCommand } from './commands/graph.js';
@@ -62,14 +64,6 @@ program
   .option('--json', 'Output as JSON')
   .option('--human', 'Force human-readable output')
   .action(wrap(pushCommand));
-
-// stash
-program
-  .command('stash <title>')
-  .description('Quick-capture an idea (alias for push with defaults)')
-  .option('--json', 'Output as JSON')
-  .option('--human', 'Force human-readable output')
-  .action(wrap(stashCommand));
 
 // search
 program
@@ -244,9 +238,44 @@ program
   .option('--human', 'Force human-readable output')
   .action(wrap(graphCommand));
 
-// keys (subcommands: list, create, revoke)
+// rm
+program
+  .command('rm <id>')
+  .description('Archive (soft-delete) an idea')
+  .option('--force', 'Skip confirmation')
+  .option('--json', 'Output as JSON')
+  .option('--human', 'Force human-readable output')
+  .action(wrap(rmCommand));
+
+// duplicate (subcommands: list, dismiss, merge)
+const dup = program
+  .command('duplicate')
+  .description('Manage duplicate detections');
+
+dup
+  .command('list')
+  .description('List pending duplicate detections')
+  .option('--json', 'Output as JSON')
+  .option('--human', 'Force human-readable output')
+  .action(wrap(duplicateListCommand));
+
+dup
+  .command('dismiss <id>')
+  .description('Dismiss a duplicate detection')
+  .option('--json', 'Output as JSON')
+  .option('--human', 'Force human-readable output')
+  .action(wrap(duplicateDismissCommand));
+
+dup
+  .command('merge <id>')
+  .description('Merge duplicate into primary idea')
+  .option('--json', 'Output as JSON')
+  .option('--human', 'Force human-readable output')
+  .action(wrap(duplicateMergeCommand));
+
+// key (subcommands: list, create, revoke)
 const keys = program
-  .command('keys')
+  .command('key')
   .description('Manage API keys');
 
 keys

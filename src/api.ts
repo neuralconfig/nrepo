@@ -148,6 +148,17 @@ export const createRelation = (
 export const deleteRelation = (c: Config, relationId: number) =>
   request<ApiSuccess>(c, 'DELETE', `/map/relations/${relationId}`);
 
+// Archive (soft delete)
+export const deleteIdea = (c: Config, id: number) =>
+  request<ApiSuccess>(c, 'DELETE', `/ideas/${id}`);
+
+// Duplicates
+export const dismissDuplicate = (c: Config, dupId: number) =>
+  request<ApiSuccess>(c, 'POST', `/ideas/duplicates/${dupId}/dismiss`);
+
+export const mergeDuplicate = (c: Config, dupId: number) =>
+  request<ApiSuccess>(c, 'POST', `/ideas/duplicates/${dupId}/merge`);
+
 // Merge
 export const mergeIdeas = (c: Config, keepId: number, absorbId: number) =>
   request<ApiIdea>(c, 'POST', `/ideas/${keepId}/merge`, { absorb_id: absorbId });

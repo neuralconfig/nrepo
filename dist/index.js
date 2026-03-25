@@ -2,7 +2,7 @@
 
 // src/index.ts
 import { Command } from "commander";
-import chalk18 from "chalk";
+import chalk20 from "chalk";
 
 // src/config.ts
 import { readFile, writeFile, mkdir } from "fs/promises";
@@ -116,6 +116,9 @@ var createRelation = (c, sourceId, targetId, relationType = "related", note, for
   });
 };
 var deleteRelation = (c, relationId) => request(c, "DELETE", `/map/relations/${relationId}`);
+var deleteIdea = (c, id) => request(c, "DELETE", `/ideas/${id}`);
+var dismissDuplicate = (c, dupId) => request(c, "POST", `/ideas/duplicates/${dupId}/dismiss`);
+var mergeDuplicate = (c, dupId) => request(c, "POST", `/ideas/duplicates/${dupId}/merge`);
 var mergeIdeas = (c, keepId, absorbId) => request(c, "POST", `/ideas/${keepId}/merge`, { absorb_id: absorbId });
 
 // src/commands/login.ts
@@ -392,9 +395,9 @@ function formatIdeaDetail(idea) {
   }
   return lines.join("\n");
 }
-function formatDuplicate(dup) {
-  const score = chalk3.yellow(`${(dup.similarity_score * 100).toFixed(0)}%`);
-  return `  ${chalk3.dim(`#${dup.id}`)} ${dup.idea_title} ${chalk3.dim("\u2248")} ${dup.duplicate_title} ${score}`;
+function formatDuplicate(dup2) {
+  const score = chalk3.yellow(`${(dup2.similarity_score * 100).toFixed(0)}%`);
+  return `  ${chalk3.dim(`#${dup2.id}`)} ${dup2.idea_title} ${chalk3.dim("\u2248")} ${dup2.duplicate_title} ${score}`;
 }
 function formatDate(iso) {
   const normalized = iso.includes("T") || iso.includes("Z") ? iso : iso.replace(" ", "T") + "Z";
@@ -436,9 +439,6 @@ async function pushCommand(title, opts) {
   if (idea.processing) {
     console.log(chalk4.dim("\n  Processing: embeddings, dedup, and auto-tagging queued"));
   }
-}
-async function stashCommand(title, opts) {
-  await pushCommand(title, { json: opts.json });
 }
 
 // src/commands/search.ts
@@ -541,8 +541,8 @@ async function statusCommand(opts) {
   const pendingDups = dupsData.duplicates.filter((d) => d.status === "pending");
   if (pendingDups.length > 0) {
     console.log(chalk7.bold(`Pending duplicates (${pendingDups.length})`));
-    for (const dup of pendingDups.slice(0, 5)) {
-      console.log(formatDuplicate(dup));
+    for (const dup2 of pendingDups.slice(0, 5)) {
+      console.log(formatDuplicate(dup2));
     }
   }
 }
@@ -966,7 +966,7 @@ async function editCommand(id, opts) {
   if (opts.body) console.log(`  Body updated (${updated.body?.length ?? 0} chars)`);
 }
 
-// src/commands/keys.ts
+// src/commands/key.ts
 import chalk14 from "chalk";
 import ora13 from "ora";
 async function keysListCommand(opts) {
@@ -979,7 +979,7 @@ async function keysListCommand(opts) {
     return;
   }
   if (api_keys.length === 0) {
-    console.log(chalk14.dim("No API keys found. Create one with `nrepo keys create <label>`."));
+    console.log(chalk14.dim("No API keys found. Create one with `nrepo key create <label>`."));
     return;
   }
   console.log(chalk14.bold(`${api_keys.length} API key${api_keys.length === 1 ? "" : "s"}
@@ -1018,9 +1018,97 @@ async function keysRevokeCommand(keyId, opts) {
   console.log(chalk14.green("\u2713") + ` API key ${chalk14.dim(keyId)} revoked.`);
 }
 
-// src/commands/link.ts
+// src/commands/rm.ts
 import chalk15 from "chalk";
 import ora14 from "ora";
+async function rmCommand(id, opts) {
+  const config = await getAuthenticatedConfig();
+  const ideaId = parseInt(id, 10);
+  if (isNaN(ideaId)) {
+    console.error("Invalid idea ID");
+    process.exit(1);
+  }
+  const spinner = opts.json ? null : ora14("Loading idea...").start();
+  const idea = await getIdea(config, ideaId);
+  spinner?.stop();
+  if (!opts.json && !opts.force) {
+    console.log(chalk15.bold("Archive preview:"));
+    console.log(`  #${ideaId} "${idea.title}" [${idea.status}]`);
+    console.log("");
+    console.log(chalk15.dim("  The idea will be archived (soft-deleted)."));
+    console.log("");
+  }
+  const archiveSpinner = opts.json ? null : ora14("Archiving idea...").start();
+  await deleteIdea(config, ideaId);
+  archiveSpinner?.stop();
+  if (opts.json) {
+    console.log(JSON.stringify({ success: true, archived: ideaId }));
+    return;
+  }
+  console.log(chalk15.green("\u2713") + ` Archived #${ideaId} "${idea.title}"`);
+}
+
+// src/commands/duplicate.ts
+import chalk16 from "chalk";
+import ora15 from "ora";
+async function duplicateListCommand(opts) {
+  const config = await getAuthenticatedConfig();
+  const spinner = opts.json ? null : ora15("Loading duplicates...").start();
+  const { duplicates } = await listDuplicates(config);
+  spinner?.stop();
+  if (opts.json) {
+    console.log(JSON.stringify({ duplicates }, null, 2));
+    return;
+  }
+  const pending = duplicates.filter((d) => d.status === "pending");
+  if (pending.length === 0) {
+    console.log(chalk16.dim("No pending duplicates."));
+    return;
+  }
+  console.log(chalk16.bold(`${pending.length} pending duplicate${pending.length === 1 ? "" : "s"}
+`));
+  for (const dup2 of pending) {
+    console.log(formatDuplicate(dup2));
+  }
+  console.log("");
+  console.log(chalk16.dim("  Use `nrepo duplicate dismiss <id>` or `nrepo duplicate merge <id>` to resolve."));
+}
+async function duplicateDismissCommand(id, opts) {
+  const config = await getAuthenticatedConfig();
+  const dupId = parseInt(id, 10);
+  if (isNaN(dupId)) {
+    console.error("Invalid duplicate ID");
+    process.exit(1);
+  }
+  const spinner = opts.json ? null : ora15("Dismissing duplicate...").start();
+  await dismissDuplicate(config, dupId);
+  spinner?.stop();
+  if (opts.json) {
+    console.log(JSON.stringify({ success: true, dismissed: dupId }));
+    return;
+  }
+  console.log(chalk16.green("\u2713") + ` Dismissed duplicate #${dupId}`);
+}
+async function duplicateMergeCommand(id, opts) {
+  const config = await getAuthenticatedConfig();
+  const dupId = parseInt(id, 10);
+  if (isNaN(dupId)) {
+    console.error("Invalid duplicate ID");
+    process.exit(1);
+  }
+  const spinner = opts.json ? null : ora15("Merging duplicate...").start();
+  await mergeDuplicate(config, dupId);
+  spinner?.stop();
+  if (opts.json) {
+    console.log(JSON.stringify({ success: true, merged: dupId }));
+    return;
+  }
+  console.log(chalk16.green("\u2713") + ` Merged duplicate #${dupId} into primary idea`);
+}
+
+// src/commands/link.ts
+import chalk17 from "chalk";
+import ora16 from "ora";
 var VALID_TYPES = RELATION_TYPES.filter((t) => t !== "duplicate");
 async function linkCommand(sourceId, targetId, opts) {
   const config = await getAuthenticatedConfig();
@@ -1035,7 +1123,7 @@ async function linkCommand(sourceId, targetId, opts) {
     console.error(`Invalid type "${relationType}". Must be one of: ${VALID_TYPES.join(", ")}`);
     process.exit(1);
   }
-  const spinner = opts.json ? null : ora14("Creating link...").start();
+  const spinner = opts.json ? null : ora16("Creating link...").start();
   try {
     const result = await createRelation(config, src, tgt, relationType, opts.note, opts.force);
     spinner?.stop();
@@ -1043,9 +1131,9 @@ async function linkCommand(sourceId, targetId, opts) {
       console.log(JSON.stringify(result.relation, null, 2));
       return;
     }
-    console.log(chalk15.green("\u2713") + ` Linked #${src} \u2192 #${tgt} (${relationType})`);
+    console.log(chalk17.green("\u2713") + ` Linked #${src} \u2192 #${tgt} (${relationType})`);
     if (opts.note) {
-      console.log(chalk15.dim(`  Note: ${opts.note}`));
+      console.log(chalk17.dim(`  Note: ${opts.note}`));
     }
   } catch (err) {
     spinner?.stop();
@@ -1053,9 +1141,9 @@ async function linkCommand(sourceId, targetId, opts) {
       if (opts.json) {
         console.error(JSON.stringify({ error: err.message, code: "cycle_detected" }));
       } else {
-        console.error(chalk15.red(err.message));
+        console.error(chalk17.red(err.message));
         if (!opts.force && (relationType === "supersedes" || relationType === "parent")) {
-          console.error(chalk15.dim("  Use --force to bypass this check."));
+          console.error(chalk17.dim("  Use --force to bypass this check."));
         }
       }
       process.exit(1);
@@ -1071,7 +1159,7 @@ async function unlinkCommand(sourceId, targetId, opts) {
     console.error("Invalid idea IDs");
     process.exit(1);
   }
-  const spinner = opts.json ? null : ora14("Removing link...").start();
+  const spinner = opts.json ? null : ora16("Removing link...").start();
   const relations = await getIdeaRelations(config, src);
   const match = relations.outgoing.find((r) => r.idea_id === tgt) ?? relations.incoming.find((r) => r.idea_id === tgt);
   if (!match) {
@@ -1079,7 +1167,7 @@ async function unlinkCommand(sourceId, targetId, opts) {
     if (opts.json) {
       console.error(JSON.stringify({ error: "No link found between these ideas" }));
     } else {
-      console.error(`No link found between #${src} and #${tgt}. Run ${chalk15.cyan(`nrepo links ${src}`)} to see existing links.`);
+      console.error(`No link found between #${src} and #${tgt}. Run ${chalk17.cyan(`nrepo links ${src}`)} to see existing links.`);
     }
     process.exit(1);
   }
@@ -1089,7 +1177,7 @@ async function unlinkCommand(sourceId, targetId, opts) {
     console.log(JSON.stringify({ success: true }));
     return;
   }
-  console.log(chalk15.green("\u2713") + ` Unlinked #${src} \u2194 #${tgt}`);
+  console.log(chalk17.green("\u2713") + ` Unlinked #${src} \u2194 #${tgt}`);
 }
 async function linksCommand(id, opts) {
   const config = await getAuthenticatedConfig();
@@ -1098,7 +1186,7 @@ async function linksCommand(id, opts) {
     console.error("Invalid idea ID");
     process.exit(1);
   }
-  const spinner = opts.json ? null : ora14("Loading links...").start();
+  const spinner = opts.json ? null : ora16("Loading links...").start();
   const [idea, relations] = await Promise.all([
     getIdea(config, ideaId),
     getIdeaRelations(config, ideaId)
@@ -1113,9 +1201,9 @@ async function linksCommand(id, opts) {
     console.log(JSON.stringify({ outgoing, incoming }, null, 2));
     return;
   }
-  console.log(chalk15.bold(`Links for #${ideaId} "${idea.title}":`));
+  console.log(chalk17.bold(`Links for #${ideaId} "${idea.title}":`));
   if (outgoing.length === 0 && incoming.length === 0) {
-    console.log(chalk15.dim("  No links"));
+    console.log(chalk17.dim("  No links"));
     return;
   }
   const DISPLAY = {
@@ -1141,10 +1229,10 @@ async function linksCommand(id, opts) {
   for (const [type, items] of outByType) {
     const d = DISPLAY[type] ?? { out: type, arrow: "\u2192" };
     console.log("");
-    console.log(`  ${chalk15.bold(d.out)} ${d.arrow}`);
+    console.log(`  ${chalk17.bold(d.out)} ${d.arrow}`);
     for (const r of items) {
-      const status = chalk15.dim(`[${r.idea_status}]`);
-      const note = r.note ? chalk15.dim(` \u2014 ${r.note}`) : "";
+      const status = chalk17.dim(`[${r.idea_status}]`);
+      const note = r.note ? chalk17.dim(` \u2014 ${r.note}`) : "";
       console.log(`    #${r.idea_id}  ${r.idea_title} ${status}${note}`);
     }
   }
@@ -1152,10 +1240,10 @@ async function linksCommand(id, opts) {
     if ((type === "related" || type === "duplicate") && outByType.has(type)) continue;
     const d = DISPLAY[type] ?? { in: type, arrow: "\u2190" };
     console.log("");
-    console.log(`  ${chalk15.bold(d.in)} \u2190`);
+    console.log(`  ${chalk17.bold(d.in)} \u2190`);
     for (const r of items) {
-      const status = chalk15.dim(`[${r.idea_status}]`);
-      const note = r.note ? chalk15.dim(` \u2014 ${r.note}`) : "";
+      const status = chalk17.dim(`[${r.idea_status}]`);
+      const note = r.note ? chalk17.dim(` \u2014 ${r.note}`) : "";
       console.log(`    #${r.idea_id}  ${r.idea_title} ${status}${note}`);
     }
   }
@@ -1163,8 +1251,8 @@ async function linksCommand(id, opts) {
 }
 
 // src/commands/merge.ts
-import chalk16 from "chalk";
-import ora15 from "ora";
+import chalk18 from "chalk";
+import ora17 from "ora";
 async function mergeCommand(keepId, absorbId, opts) {
   const config = await getAuthenticatedConfig();
   const keep = parseInt(keepId, 10);
@@ -1177,37 +1265,37 @@ async function mergeCommand(keepId, absorbId, opts) {
     console.error("Cannot merge an idea with itself");
     process.exit(1);
   }
-  const spinner = opts.json ? null : ora15("Loading ideas...").start();
+  const spinner = opts.json ? null : ora17("Loading ideas...").start();
   const [keepIdea, absorbIdea] = await Promise.all([
     getIdea(config, keep),
     getIdea(config, absorb)
   ]);
   spinner?.stop();
   if (!opts.json && !opts.force) {
-    console.log(chalk16.bold("Merge preview:"));
+    console.log(chalk18.bold("Merge preview:"));
     console.log(`  Keep:    #${keep} "${keepIdea.title}" [${keepIdea.status}]`);
     console.log(`  Absorb:  #${absorb} "${absorbIdea.title}" [${absorbIdea.status}]`);
     console.log("");
-    console.log(chalk16.dim("  The absorbed idea will be shelved and archived."));
-    console.log(chalk16.dim("  Bodies will be concatenated, tags merged."));
+    console.log(chalk18.dim("  The absorbed idea will be shelved and archived."));
+    console.log(chalk18.dim("  Bodies will be concatenated, tags merged."));
     console.log("");
   }
-  const mergeSpinner = opts.json ? null : ora15("Merging ideas...").start();
+  const mergeSpinner = opts.json ? null : ora17("Merging ideas...").start();
   const result = await mergeIdeas(config, keep, absorb);
   mergeSpinner?.stop();
   if (opts.json) {
     console.log(JSON.stringify(result, null, 2));
     return;
   }
-  console.log(chalk16.green("\u2713") + ` Merged #${absorb} into #${keep}`);
+  console.log(chalk18.green("\u2713") + ` Merged #${absorb} into #${keep}`);
   console.log(`  Title: "${result.title}"`);
   console.log(`  Tags: ${result.tags?.length ? result.tags.join(", ") : "none"}`);
   console.log(`  #${absorb} "${absorbIdea.title}" \u2192 shelved (superseded by #${keep})`);
 }
 
 // src/commands/graph.ts
-import chalk17 from "chalk";
-import ora16 from "ora";
+import chalk19 from "chalk";
+import ora18 from "ora";
 async function graphCommand(id, opts) {
   const config = await getAuthenticatedConfig();
   const startId = parseInt(id, 10);
@@ -1217,7 +1305,7 @@ async function graphCommand(id, opts) {
   }
   const maxDepth = Math.min(parseInt(opts.depth ?? "1", 10), 5);
   const typeFilter = opts.type?.split(",");
-  const spinner = opts.json ? null : ora16("Traversing graph...").start();
+  const spinner = opts.json ? null : ora18("Traversing graph...").start();
   const visited = /* @__PURE__ */ new Map();
   const edges = [];
   const children = /* @__PURE__ */ new Map();
@@ -1267,23 +1355,23 @@ async function graphCommand(id, opts) {
     return;
   }
   const statusStyle3 = {
-    captured: chalk17.gray,
-    exploring: chalk17.cyan,
-    building: chalk17.yellow,
-    shipped: chalk17.green,
-    shelved: chalk17.dim
+    captured: chalk19.gray,
+    exploring: chalk19.cyan,
+    building: chalk19.yellow,
+    shipped: chalk19.green,
+    shelved: chalk19.dim
   };
   const typeColor = {
-    blocks: chalk17.red,
-    inspires: chalk17.cyan,
-    supersedes: chalk17.dim,
-    parent: chalk17.white,
-    related: chalk17.magenta,
-    duplicate: chalk17.yellow
+    blocks: chalk19.red,
+    inspires: chalk19.cyan,
+    supersedes: chalk19.dim,
+    parent: chalk19.white,
+    related: chalk19.magenta,
+    duplicate: chalk19.yellow
   };
   function renderTree(nodeId, prefix, isLast, isRoot) {
     const node = visited.get(nodeId);
-    const style = statusStyle3[node.status] ?? chalk17.white;
+    const style = statusStyle3[node.status] ?? chalk19.white;
     const connector = isRoot ? "" : isLast ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ";
     const childPrefix = isRoot ? "" : isLast ? "    " : "\u2502   ";
     const nodeChildren = children.get(nodeId) ?? [];
@@ -1295,9 +1383,9 @@ async function graphCommand(id, opts) {
     }
     for (const [i, child] of nodeChildren.entries()) {
       const last = i === nodeChildren.length - 1;
-      const tc = typeColor[child.type] ?? chalk17.white;
+      const tc = typeColor[child.type] ?? chalk19.white;
       const childNode = visited.get(child.childId);
-      const childStyle = statusStyle3[childNode.status] ?? chalk17.white;
+      const childStyle = statusStyle3[childNode.status] ?? chalk19.white;
       const childConnector = last ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ";
       const nextPrefix = prefix + childPrefix + (last ? "    " : "\u2502   ");
       console.log(
@@ -1308,8 +1396,8 @@ async function graphCommand(id, opts) {
         const gcLast = j === grandchildren.length - 1;
         const gcNode = visited.get(gc.childId);
         if (!gcNode) continue;
-        const gcStyle = statusStyle3[gcNode.status] ?? chalk17.white;
-        const gcTc = typeColor[gc.type] ?? chalk17.white;
+        const gcStyle = statusStyle3[gcNode.status] ?? chalk19.white;
+        const gcTc = typeColor[gc.type] ?? chalk19.white;
         const gcConnector = gcLast ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ";
         console.log(
           `${nextPrefix}${gcConnector}${gcTc(gc.type)} \u2192 #${gc.childId} ${gc.title} ${gcStyle(`[${gcNode.status}]`)}`
@@ -1319,9 +1407,9 @@ async function graphCommand(id, opts) {
   }
   if (visited.size === 1) {
     const root = visited.get(startId);
-    const style = statusStyle3[root.status] ?? chalk17.white;
+    const style = statusStyle3[root.status] ?? chalk19.white;
     console.log(`#${root.id} ${root.title} ${style(`[${root.status}]`)}`);
-    console.log(chalk17.dim("  No connections found"));
+    console.log(chalk19.dim("  No connections found"));
   } else {
     renderTree(startId, "", true, true);
   }
@@ -1337,7 +1425,6 @@ program.command("logout").description("Clear stored credentials").action(wrap(as
 }));
 program.command("whoami").description("Show current user info").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(whoamiCommand));
 program.command("push <title>").description("Create a new idea").option("--body <text>", "Idea body/description").option("--tag <tag>", "Add tag (repeatable)", collect, []).option("--status <status>", "Initial status (captured|exploring|building|shipped|shelved)").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(pushCommand));
-program.command("stash <title>").description("Quick-capture an idea (alias for push with defaults)").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(stashCommand));
 program.command("search <query>").description("Search ideas (semantic + full-text)").option("--limit <n>", "Max results").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(searchCommand));
 program.command("log").description("List recent ideas").option("--limit <n>", "Max results (default: 20)").option("--status <status>", "Filter by status").option("--tag <tag>", "Filter by tag").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(logCommand));
 program.command("status").description("Overview dashboard").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(statusCommand));
@@ -1369,7 +1456,12 @@ program.command("unlink <source-id> <target-id>").description("Remove a link bet
 program.command("links <id>").description("Show all links for an idea").option("--type <type>", "Filter by link type").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(linksCommand));
 program.command("merge <keep-id> <absorb-id>").description("Merge two ideas (absorb the second into the first)").option("--force", "Skip confirmation").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(mergeCommand));
 program.command("graph <id>").description("Explore the connection graph from an idea").option("--depth <n>", "Max hops (default: 1, max: 5)").option("--type <types>", "Comma-separated edge types to follow").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(graphCommand));
-var keys = program.command("keys").description("Manage API keys");
+program.command("rm <id>").description("Archive (soft-delete) an idea").option("--force", "Skip confirmation").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(rmCommand));
+var dup = program.command("duplicate").description("Manage duplicate detections");
+dup.command("list").description("List pending duplicate detections").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(duplicateListCommand));
+dup.command("dismiss <id>").description("Dismiss a duplicate detection").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(duplicateDismissCommand));
+dup.command("merge <id>").description("Merge duplicate into primary idea").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(duplicateMergeCommand));
+var keys = program.command("key").description("Manage API keys");
 keys.command("list").description("List all API keys").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysListCommand));
 keys.command("create <label>").description("Create a new API key").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysCreateCommand));
 keys.command("revoke <key-id>").description("Revoke an API key").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysRevokeCommand));
@@ -1404,21 +1496,21 @@ function wrap(fn) {
         process.exit(1);
       }
       if (err instanceof AuthError) {
-        console.error(chalk18.red(err.message));
+        console.error(chalk20.red(err.message));
         process.exit(1);
       }
       if (err instanceof ApiError) {
         if (err.status === 401) {
-          console.error(chalk18.red("Authentication expired. Run `nrepo login` to re-authenticate."));
+          console.error(chalk20.red("Authentication expired. Run `nrepo login` to re-authenticate."));
         } else if (err.status === 403) {
-          console.error(chalk18.yellow("This feature requires a Pro plan. Upgrade at https://neuralrepo.com/settings"));
+          console.error(chalk20.yellow("This feature requires a Pro plan. Upgrade at https://neuralrepo.com/settings"));
         } else {
-          console.error(chalk18.red(`API error (${err.status}): ${err.message}`));
+          console.error(chalk20.red(`API error (${err.status}): ${err.message}`));
         }
         process.exit(1);
       }
       if (err instanceof Error && err.message.startsWith("Network error")) {
-        console.error(chalk18.red(err.message));
+        console.error(chalk20.red(err.message));
         process.exit(1);
       }
       throw err;

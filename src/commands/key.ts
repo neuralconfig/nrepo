@@ -17,7 +17,7 @@ export async function keysListCommand(opts: { json?: boolean; human?: boolean })
   }
 
   if (api_keys.length === 0) {
-    console.log(chalk.dim('No API keys found. Create one with `nrepo keys create <label>`.'));
+    console.log(chalk.dim('No API keys found. Create one with `nrepo key create <label>`.'));
     return;
   }
 

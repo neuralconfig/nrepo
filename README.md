@@ -2,7 +2,7 @@
 
 CLI for [NeuralRepo](https://neuralrepo.com) — AI-native idea capture and management.
 
-Capture ideas, search semantically, organize with tags and statuses, link related ideas, and pull context for development — all from the terminal. Commands mirror git vocabulary (`push`, `log`, `diff`, `branch`, `merge`, `tag`, `stash`) for familiarity to both humans and LLMs. Designed to compose with unix pipes and tools like `jq`.
+Capture ideas, search semantically, organize with tags and statuses, link related ideas, and pull context for development — all from the terminal. Commands mirror git vocabulary (`push`, `log`, `diff`, `branch`, `merge`, `tag`, `rm`) for familiarity to both humans and LLMs. Designed to compose with unix pipes and tools like `jq`.
 
 ## Install
 
@@ -97,8 +97,8 @@ Always search before creating to avoid duplicates — the server runs semantic d
 # Full capture with body and tags
 nrepo push "Add rate limiting to API" --body "Sliding window algorithm, store in KV" --tag backend --tag infrastructure
 
-# Quick capture (title only)
-nrepo stash "Look into edge caching for static assets"
+# Quick capture (title only — body and tags are optional)
+nrepo push "Look into edge caching for static assets"
 ```
 
 **push options:** `--body <text>`, `--tag <tag>` (repeatable), `--status <status>`
@@ -229,12 +229,30 @@ nrepo pull 42 --to ./idea-context
 nrepo status    # Idea counts by status, recent captures, pending duplicates
 ```
 
+### Archive ideas
+
+```bash
+nrepo rm 42              # Archive (soft-delete) an idea
+nrepo rm 42 --force      # Skip confirmation
+```
+
+### Manage duplicates
+
+The server automatically detects semantic duplicates. Review and resolve them:
+
+```bash
+nrepo duplicate              # List pending duplicate detections
+nrepo duplicate list         # Same as above
+nrepo duplicate dismiss 7    # Dismiss a false positive
+nrepo duplicate merge 7      # Merge duplicate into its primary idea
+```
+
 ### API key management
 
 ```bash
-nrepo keys list              # List all API keys
-nrepo keys create "CI bot"   # Generate a new key (shown once)
-nrepo keys revoke 7          # Revoke a key by ID
+nrepo key list              # List all API keys
+nrepo key create "CI bot"   # Generate a new key (shown once)
+nrepo key revoke 7          # Revoke a key by ID
 ```
 
 ## JSON output and unix composition
