@@ -2,7 +2,7 @@
 
 // src/index.ts
 import { Command } from "commander";
-import chalk20 from "chalk";
+import chalk21 from "chalk";
 
 // src/config.ts
 import { readFile, writeFile, mkdir } from "fs/promises";
@@ -1415,9 +1415,104 @@ async function graphCommand(id, opts) {
   }
 }
 
+// src/update-check.ts
+import { readFileSync, existsSync as existsSync2 } from "fs";
+import { writeFile as writeFile3, mkdir as mkdir3, copyFile } from "fs/promises";
+import { homedir as homedir2 } from "os";
+import { join as join3, dirname } from "path";
+import { fileURLToPath } from "url";
+import chalk20 from "chalk";
+var CHECK_FILE = join3(CONFIG_DIR, "update-check.json");
+var WEEK_MS = 7 * 24 * 60 * 60 * 1e3;
+var PACKAGE_NAME = "@neuralconfig/nrepo";
+function checkForUpdates(currentVersion) {
+  if (process.env["NREPO_NO_UPDATE_CHECK"] === "1") return;
+  try {
+    const cached = readCachedCheck();
+    if (cached?.latest_version && isNewer(cached.latest_version, currentVersion)) {
+      printUpdateNotice(currentVersion, cached.latest_version);
+    }
+    if (!cached || isStale(cached.last_checked)) {
+      fetchAndCache(currentVersion);
+    }
+  } catch {
+  }
+}
+function printUpdateNotice(current, latest) {
+  console.error(
+    chalk20.dim(`  nrepo ${latest} available (current: ${current}). Run `) + chalk20.dim.bold("npm i -g @neuralconfig/nrepo") + chalk20.dim(" to update.")
+  );
+  console.error("");
+}
+function readCachedCheck() {
+  if (!existsSync2(CHECK_FILE)) return null;
+  try {
+    const raw = readFileSync(CHECK_FILE, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+function isStale(lastChecked) {
+  return Date.now() - new Date(lastChecked).getTime() > WEEK_MS;
+}
+function isNewer(latest, current) {
+  const l = latest.split(".").map(Number);
+  const c = current.split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((l[i] ?? 0) > (c[i] ?? 0)) return true;
+    if ((l[i] ?? 0) < (c[i] ?? 0)) return false;
+  }
+  return false;
+}
+function fetchAndCache(currentVersion) {
+  (async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5e3);
+    try {
+      const res = await fetch(
+        `https://registry.npmjs.org/${PACKAGE_NAME}/latest`,
+        { signal: controller.signal }
+      );
+      clearTimeout(timeout);
+      if (!res.ok) return;
+      const data = await res.json();
+      const latest = data.version;
+      if (!existsSync2(CONFIG_DIR)) {
+        await mkdir3(CONFIG_DIR, { recursive: true });
+      }
+      const check = {
+        last_checked: (/* @__PURE__ */ new Date()).toISOString(),
+        latest_version: latest
+      };
+      await writeFile3(CHECK_FILE, JSON.stringify(check, null, 2) + "\n", "utf-8");
+      if (isNewer(latest, currentVersion)) {
+        await updateSkillFile();
+      }
+    } catch {
+    }
+  })();
+}
+async function updateSkillFile() {
+  try {
+    const claudeDir = join3(homedir2(), ".claude");
+    if (!existsSync2(claudeDir)) return;
+    const skillDir = join3(claudeDir, "skills", "neuralrepo");
+    if (!existsSync2(skillDir)) {
+      await mkdir3(skillDir, { recursive: true });
+    }
+    const src = join3(dirname(fileURLToPath(import.meta.url)), "..", "skill", "SKILL.md");
+    if (!existsSync2(src)) return;
+    const dest = join3(skillDir, "SKILL.md");
+    await copyFile(src, dest);
+  } catch {
+  }
+}
+
 // src/index.ts
+var VERSION = "0.0.4";
 var program = new Command();
-program.name("nrepo").description("NeuralRepo \u2014 capture and manage ideas from the terminal").version("0.0.2");
+program.name("nrepo").description("NeuralRepo \u2014 capture and manage ideas from the terminal").version(VERSION);
 program.command("login").description("Authenticate with NeuralRepo").option("--api-key", "Login with an API key instead of browser OAuth").action(wrap(loginCommand));
 program.command("logout").description("Clear stored credentials").action(wrap(async () => {
   await clearConfig();
@@ -1465,6 +1560,7 @@ var keys = program.command("key").description("Manage API keys");
 keys.command("list").description("List all API keys").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysListCommand));
 keys.command("create <label>").description("Create a new API key").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysCreateCommand));
 keys.command("revoke <key-id>").description("Revoke an API key").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysRevokeCommand));
+checkForUpdates(VERSION);
 program.parse();
 function collect(value, previous) {
   return previous.concat([value]);
@@ -1496,21 +1592,21 @@ function wrap(fn) {
         process.exit(1);
       }
       if (err instanceof AuthError) {
-        console.error(chalk20.red(err.message));
+        console.error(chalk21.red(err.message));
         process.exit(1);
       }
       if (err instanceof ApiError) {
         if (err.status === 401) {
-          console.error(chalk20.red("Authentication expired. Run `nrepo login` to re-authenticate."));
+          console.error(chalk21.red("Authentication expired. Run `nrepo login` to re-authenticate."));
         } else if (err.status === 403) {
-          console.error(chalk20.yellow("This feature requires a Pro plan. Upgrade at https://neuralrepo.com/settings"));
+          console.error(chalk21.yellow("This feature requires a Pro plan. Upgrade at https://neuralrepo.com/settings"));
         } else {
-          console.error(chalk20.red(`API error (${err.status}): ${err.message}`));
+          console.error(chalk21.red(`API error (${err.status}): ${err.message}`));
         }
         process.exit(1);
       }
       if (err instanceof Error && err.message.startsWith("Network error")) {
-        console.error(chalk20.red(err.message));
+        console.error(chalk21.red(err.message));
         process.exit(1);
       }
       throw err;

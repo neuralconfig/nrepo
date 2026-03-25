@@ -22,13 +22,16 @@ import { linkCommand, unlinkCommand, linksCommand } from './commands/link.js';
 import { mergeCommand } from './commands/merge.js';
 import { graphCommand } from './commands/graph.js';
 import { clearConfig } from './config.js';
+import { checkForUpdates } from './update-check.js';
+
+const VERSION = '0.0.4';
 
 const program = new Command();
 
 program
   .name('nrepo')
   .description('NeuralRepo — capture and manage ideas from the terminal')
-  .version('0.0.2');
+  .version(VERSION);
 
 // login
 program
@@ -298,6 +301,9 @@ keys
   .option('--json', 'Output as JSON')
   .option('--human', 'Force human-readable output')
   .action(wrap(keysRevokeCommand));
+
+// Non-blocking update check (reads cache, prints notice, fetches in background)
+checkForUpdates(VERSION);
 
 program.parse();
 
