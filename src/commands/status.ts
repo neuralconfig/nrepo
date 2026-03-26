@@ -3,7 +3,7 @@ import ora from 'ora';
 import { getAuthenticatedConfig } from '../config.js';
 import * as api from '../api.js';
 import { formatStatusCounts, formatIdeaRow, formatDuplicate } from '../format.js';
-import type { IdeaStatus } from '@neuralrepo/shared';
+import type { IdeaStatus, ApiIdea } from '@neuralrepo/shared';
 
 const statusStyle: Record<IdeaStatus, (s: string) => string> = {
   captured: chalk.gray,
@@ -13,12 +13,25 @@ const statusStyle: Record<IdeaStatus, (s: string) => string> = {
   shelved: chalk.dim,
 };
 
+async function fetchAllIdeas(config: Awaited<ReturnType<typeof getAuthenticatedConfig>>): Promise<ApiIdea[]> {
+  const all: ApiIdea[] = [];
+  let offset = 0;
+  const pageSize = 100;
+  while (true) {
+    const data = await api.listIdeas(config, { limit: pageSize, offset });
+    all.push(...data.ideas);
+    if (data.ideas.length < pageSize || !data.has_more) break;
+    offset += data.ideas.length;
+  }
+  return all;
+}
+
 export async function statusCommand(opts: { json?: boolean }): Promise<void> {
   const config = await getAuthenticatedConfig();
   const spinner = opts.json ? null : ora('Loading dashboard...').start();
 
-  const [ideasData, dupsData, user] = await Promise.all([
-    api.listIdeas(config, { limit: 100 }),
+  const [allIdeas, dupsData, user] = await Promise.all([
+    fetchAllIdeas(config),
     api.listDuplicates(config),
     api.getMe(config),
   ]);
@@ -28,8 +41,8 @@ export async function statusCommand(opts: { json?: boolean }): Promise<void> {
   if (opts.json) {
     console.log(JSON.stringify({
       user: { email: user.email, plan: user.plan },
-      counts: formatStatusCounts(ideasData.ideas),
-      total: ideasData.ideas.length,
+      counts: formatStatusCounts(allIdeas),
+      total: allIdeas.length,
       pending_duplicates: dupsData.duplicates.length,
     }, null, 2));
     return;
@@ -38,17 +51,17 @@ export async function statusCommand(opts: { json?: boolean }): Promise<void> {
   console.log(chalk.bold('NeuralRepo Dashboard'));
   console.log(chalk.dim(`${user.display_name ?? user.email} · ${user.plan}\n`));
 
-  const counts = formatStatusCounts(ideasData.ideas);
+  const counts = formatStatusCounts(allIdeas);
   console.log(chalk.bold('Status breakdown'));
   for (const [status, count] of Object.entries(counts)) {
     const style = statusStyle[status as IdeaStatus] ?? chalk.white;
     const bar = '█'.repeat(Math.min(count, 40));
     console.log(`  ${style(status.padEnd(10))} ${style(bar)} ${count}`);
   }
-  console.log(`  ${'total'.padEnd(10)} ${chalk.bold(String(ideasData.ideas.length))}\n`);
+  console.log(`  ${'total'.padEnd(10)} ${chalk.bold(String(allIdeas.length))}\n`);
 
   // Recent captures
-  const recent = ideasData.ideas
+  const recent = allIdeas
     .filter((i) => i.status === 'captured')
     .slice(0, 5);
   if (recent.length > 0) {

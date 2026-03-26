@@ -471,21 +471,34 @@ import ora4 from "ora";
 async function logCommand(opts) {
   const config = await getAuthenticatedConfig();
   const spinner = opts.json ? null : ora4("Loading ideas...").start();
-  const data = await listIdeas(config, {
-    limit: opts.limit ? parseInt(opts.limit, 10) : 20,
-    status: opts.status,
-    tag: opts.tag
-  });
+  const explicitLimit = opts.limit ? parseInt(opts.limit, 10) : void 0;
+  const pageSize = 100;
+  const allIdeas = [];
+  let offset = 0;
+  let remaining = explicitLimit ?? Infinity;
+  while (remaining > 0) {
+    const fetchLimit = Math.min(pageSize, remaining);
+    const data = await listIdeas(config, {
+      limit: fetchLimit,
+      offset,
+      status: opts.status,
+      tag: opts.tag
+    });
+    allIdeas.push(...data.ideas);
+    offset += data.ideas.length;
+    remaining -= data.ideas.length;
+    if (data.ideas.length < fetchLimit || !data.has_more) break;
+  }
   spinner?.stop();
   if (opts.json) {
-    console.log(JSON.stringify(data.ideas, null, 2));
+    console.log(JSON.stringify(allIdeas, null, 2));
     return;
   }
-  if (data.ideas.length === 0) {
+  if (allIdeas.length === 0) {
     console.log(chalk6.dim("No ideas found."));
     return;
   }
-  for (const idea of data.ideas) {
+  for (const idea of allIdeas) {
     console.log(formatIdeaRow(idea));
   }
 }
@@ -500,11 +513,23 @@ var statusStyle2 = {
   shipped: chalk7.green,
   shelved: chalk7.dim
 };
+async function fetchAllIdeas(config) {
+  const all = [];
+  let offset = 0;
+  const pageSize = 100;
+  while (true) {
+    const data = await listIdeas(config, { limit: pageSize, offset });
+    all.push(...data.ideas);
+    if (data.ideas.length < pageSize || !data.has_more) break;
+    offset += data.ideas.length;
+  }
+  return all;
+}
 async function statusCommand(opts) {
   const config = await getAuthenticatedConfig();
   const spinner = opts.json ? null : ora5("Loading dashboard...").start();
-  const [ideasData, dupsData, user] = await Promise.all([
-    listIdeas(config, { limit: 100 }),
+  const [allIdeas, dupsData, user] = await Promise.all([
+    fetchAllIdeas(config),
     listDuplicates(config),
     getMe(config)
   ]);
@@ -512,8 +537,8 @@ async function statusCommand(opts) {
   if (opts.json) {
     console.log(JSON.stringify({
       user: { email: user.email, plan: user.plan },
-      counts: formatStatusCounts(ideasData.ideas),
-      total: ideasData.ideas.length,
+      counts: formatStatusCounts(allIdeas),
+      total: allIdeas.length,
       pending_duplicates: dupsData.duplicates.length
     }, null, 2));
     return;
@@ -521,16 +546,16 @@ async function statusCommand(opts) {
   console.log(chalk7.bold("NeuralRepo Dashboard"));
   console.log(chalk7.dim(`${user.display_name ?? user.email} \xB7 ${user.plan}
 `));
-  const counts = formatStatusCounts(ideasData.ideas);
+  const counts = formatStatusCounts(allIdeas);
   console.log(chalk7.bold("Status breakdown"));
   for (const [status, count] of Object.entries(counts)) {
     const style = statusStyle2[status] ?? chalk7.white;
     const bar = "\u2588".repeat(Math.min(count, 40));
     console.log(`  ${style(status.padEnd(10))} ${style(bar)} ${count}`);
   }
-  console.log(`  ${"total".padEnd(10)} ${chalk7.bold(String(ideasData.ideas.length))}
+  console.log(`  ${"total".padEnd(10)} ${chalk7.bold(String(allIdeas.length))}
 `);
-  const recent = ideasData.ideas.filter((i) => i.status === "captured").slice(0, 5);
+  const recent = allIdeas.filter((i) => i.status === "captured").slice(0, 5);
   if (recent.length > 0) {
     console.log(chalk7.bold("Recent captures"));
     for (const idea of recent) {

@@ -288,6 +288,7 @@ export interface ApiKeyCreated {
 
 export interface IdeasResponse {
   ideas: ApiIdea[];
+  has_more?: boolean;
 }
 
 export interface SearchResponse {
