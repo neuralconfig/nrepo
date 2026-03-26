@@ -1550,7 +1550,11 @@ async function updateSkillFile() {
 }
 
 // src/index.ts
-var VERSION = "0.0.4";
+import { readFileSync as readFileSync2 } from "fs";
+import { fileURLToPath as fileURLToPath2 } from "url";
+import { dirname as dirname2, join as join4 } from "path";
+var __dirname = dirname2(fileURLToPath2(import.meta.url));
+var VERSION = JSON.parse(readFileSync2(join4(__dirname, "..", "package.json"), "utf8")).version;
 var program = new Command();
 program.name("nrepo").description("NeuralRepo \u2014 capture and manage ideas from the terminal").version(VERSION);
 program.command("login").description("Authenticate with NeuralRepo").option("--api-key", "Login with an API key instead of browser OAuth").action(wrap(loginCommand));

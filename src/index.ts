@@ -23,8 +23,12 @@ import { mergeCommand } from './commands/merge.js';
 import { graphCommand } from './commands/graph.js';
 import { clearConfig } from './config.js';
 import { checkForUpdates } from './update-check.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-const VERSION = '0.0.4';
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const VERSION = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')).version as string;
 
 const program = new Command();
 

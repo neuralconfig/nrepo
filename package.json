@@ -1,6 +1,6 @@
 {
   "name": "@neuralconfig/nrepo",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "NeuralRepo CLI — capture and manage ideas from the terminal",
   "type": "module",
   "bin": {
