@@ -84,6 +84,23 @@ export const getIdea = (c: Config, id: number) =>
 export const updateIdea = (c: Config, id: number, data: UpdateIdeaInput) =>
   request<ApiIdea>(c, 'PATCH', `/ideas/${id}`, data);
 
+export interface BulkUpdateInput {
+  ids: number[];
+  status?: string;
+  tags?: string[];
+  add_tags?: string[];
+  remove_tags?: string[];
+}
+
+export interface BulkUpdateResult {
+  id: number;
+  status: 'updated' | 'error';
+  error?: string;
+}
+
+export const bulkUpdateIdeas = (c: Config, data: BulkUpdateInput) =>
+  request<{ updated: number; errors: number; results: BulkUpdateResult[] }>(c, 'PATCH', '/ideas/bulk', data);
+
 export const searchIdeas = (c: Config, query: string, limit?: number) => {
   const sp = new URLSearchParams({ q: query });
   if (limit) sp.set('limit', String(limit));
@@ -143,6 +160,31 @@ export const createRelation = (
     relation_type: relationType,
     ...(note ? { note } : {}),
   });
+};
+
+export interface BulkLinkInput {
+  source_idea_id: number;
+  target_idea_id: number;
+  relation_type?: string;
+  note?: string;
+}
+
+export interface BulkLinkResult {
+  source_idea_id: number;
+  target_idea_id: number;
+  relation_type: string;
+  status: 'created' | 'error';
+  relation_id?: number;
+  error?: string;
+}
+
+export const createBulkRelations = (
+  c: Config,
+  links: BulkLinkInput[],
+  force?: boolean,
+) => {
+  const qs = force ? '?force=true' : '';
+  return request<{ linked: number; errors: number; results: BulkLinkResult[] }>(c, 'POST', `/map/relations${qs}`, { links });
 };
 
 export const deleteRelation = (c: Config, relationId: number) =>

@@ -52,31 +52,20 @@ export async function moveBulkCommand(
 
   const spinner = opts.json ? null : ora(`Moving ${ids.length} ideas to ${status}...`).start();
 
-  const results = await Promise.allSettled(
-    ids.map(async (id) => {
-      const idea = await api.updateIdea(config, id, { status: status as IdeaStatus });
-      return { id, title: idea.title };
-    })
-  );
-
+  const result = await api.bulkUpdateIdeas(config, { ids, status });
   spinner?.stop();
 
   if (opts.json) {
-    const output = results.map((r, i) => ({
-      id: ids[i],
-      success: r.status === 'fulfilled',
-      error: r.status === 'rejected' ? (r.reason as Error).message : undefined,
-    }));
-    console.log(JSON.stringify(output, null, 2));
+    console.log(JSON.stringify(result, null, 2));
     return;
   }
 
-  console.log(`Moved ${ids.length} ideas to ${status}:`);
-  results.forEach((r, i) => {
-    if (r.status === 'fulfilled') {
-      console.log(`  ${chalk.green('✓')} #${ids[i]}  ${r.value.title}`);
+  for (const r of result.results) {
+    if (r.status === 'updated') {
+      console.log(`  ${chalk.green('✓')} #${r.id}`);
     } else {
-      console.log(`  ${chalk.red('✗')} #${ids[i]}  ${(r.reason as Error).message}`);
+      console.log(`  ${chalk.red('✗')} #${r.id}  ${r.error}`);
     }
-  });
+  }
+  console.log(`${chalk.green(result.updated.toString())} moved to ${status}, ${result.errors > 0 ? chalk.red(result.errors.toString()) : '0'} errors`);
 }

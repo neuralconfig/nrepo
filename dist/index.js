@@ -96,6 +96,7 @@ var listIdeas = (c, params) => {
 var createIdea = (c, data) => request(c, "POST", "/ideas", data);
 var getIdea = (c, id) => request(c, "GET", `/ideas/${id}`);
 var updateIdea = (c, id, data) => request(c, "PATCH", `/ideas/${id}`, data);
+var bulkUpdateIdeas = (c, data) => request(c, "PATCH", "/ideas/bulk", data);
 var searchIdeas = (c, query, limit) => {
   const sp = new URLSearchParams({ q: query });
   if (limit) sp.set("limit", String(limit));
@@ -114,6 +115,10 @@ var createRelation = (c, sourceId, targetId, relationType = "related", note, for
     relation_type: relationType,
     ...note ? { note } : {}
   });
+};
+var createBulkRelations = (c, links, force) => {
+  const qs = force ? "?force=true" : "";
+  return request(c, "POST", `/map/relations${qs}`, { links });
 };
 var deleteRelation = (c, relationId) => request(c, "DELETE", `/map/relations/${relationId}`);
 var deleteIdea = (c, id) => request(c, "DELETE", `/ideas/${id}`);
@@ -626,30 +631,20 @@ async function moveBulkCommand(status, opts) {
     process.exit(1);
   }
   const spinner = opts.json ? null : ora7(`Moving ${ids.length} ideas to ${status}...`).start();
-  const results = await Promise.allSettled(
-    ids.map(async (id) => {
-      const idea = await updateIdea(config, id, { status });
-      return { id, title: idea.title };
-    })
-  );
+  const result = await bulkUpdateIdeas(config, { ids, status });
   spinner?.stop();
   if (opts.json) {
-    const output = results.map((r, i) => ({
-      id: ids[i],
-      success: r.status === "fulfilled",
-      error: r.status === "rejected" ? r.reason.message : void 0
-    }));
-    console.log(JSON.stringify(output, null, 2));
+    console.log(JSON.stringify(result, null, 2));
     return;
   }
-  console.log(`Moved ${ids.length} ideas to ${status}:`);
-  results.forEach((r, i) => {
-    if (r.status === "fulfilled") {
-      console.log(`  ${chalk8.green("\u2713")} #${ids[i]}  ${r.value.title}`);
+  for (const r of result.results) {
+    if (r.status === "updated") {
+      console.log(`  ${chalk8.green("\u2713")} #${r.id}`);
     } else {
-      console.log(`  ${chalk8.red("\u2717")} #${ids[i]}  ${r.reason.message}`);
+      console.log(`  ${chalk8.red("\u2717")} #${r.id}  ${r.error}`);
     }
-  });
+  }
+  console.log(`${chalk8.green(result.updated.toString())} moved to ${status}, ${result.errors > 0 ? chalk8.red(result.errors.toString()) : "0"} errors`);
 }
 
 // src/commands/tag.ts
@@ -685,32 +680,20 @@ async function tagAddCommand(tag, opts) {
     process.exit(1);
   }
   const spinner = opts.json ? null : ora8(`Adding tag "${tag}" to ${ids.length} ideas...`).start();
-  const results = await Promise.allSettled(
-    ids.map(async (id) => {
-      const existing = await getIdea(config, id);
-      const merged = [.../* @__PURE__ */ new Set([...existing.tags, tag])];
-      await updateIdea(config, id, { tags: merged });
-      return { id, title: existing.title };
-    })
-  );
+  const result = await bulkUpdateIdeas(config, { ids, add_tags: [tag] });
   spinner?.stop();
   if (opts.json) {
-    const output = results.map((r, i) => ({
-      id: ids[i],
-      success: r.status === "fulfilled",
-      error: r.status === "rejected" ? r.reason.message : void 0
-    }));
-    console.log(JSON.stringify(output, null, 2));
+    console.log(JSON.stringify(result, null, 2));
     return;
   }
-  console.log(`Tagged ${ids.length} ideas with "${tag}":`);
-  results.forEach((r, i) => {
-    if (r.status === "fulfilled") {
-      console.log(`  ${chalk9.green("\u2713")} #${ids[i]}  ${r.value.title}`);
+  for (const r of result.results) {
+    if (r.status === "updated") {
+      console.log(`  ${chalk9.green("\u2713")} #${r.id}`);
     } else {
-      console.log(`  ${chalk9.red("\u2717")} #${ids[i]}  ${r.reason.message}`);
+      console.log(`  ${chalk9.red("\u2717")} #${r.id}  ${r.error}`);
     }
-  });
+  }
+  console.log(`${chalk9.green(result.updated.toString())} tagged with "${tag}", ${result.errors > 0 ? chalk9.red(result.errors.toString()) : "0"} errors`);
 }
 async function tagRemoveCommand(tag, opts) {
   const config = await getAuthenticatedConfig();
@@ -720,32 +703,20 @@ async function tagRemoveCommand(tag, opts) {
     process.exit(1);
   }
   const spinner = opts.json ? null : ora8(`Removing tag "${tag}" from ${ids.length} ideas...`).start();
-  const results = await Promise.allSettled(
-    ids.map(async (id) => {
-      const existing = await getIdea(config, id);
-      const filtered = existing.tags.filter((t) => t !== tag);
-      await updateIdea(config, id, { tags: filtered });
-      return { id, title: existing.title };
-    })
-  );
+  const result = await bulkUpdateIdeas(config, { ids, remove_tags: [tag] });
   spinner?.stop();
   if (opts.json) {
-    const output = results.map((r, i) => ({
-      id: ids[i],
-      success: r.status === "fulfilled",
-      error: r.status === "rejected" ? r.reason.message : void 0
-    }));
-    console.log(JSON.stringify(output, null, 2));
+    console.log(JSON.stringify(result, null, 2));
     return;
   }
-  console.log(`Removed tag "${tag}" from ${ids.length} ideas:`);
-  results.forEach((r, i) => {
-    if (r.status === "fulfilled") {
-      console.log(`  ${chalk9.green("\u2713")} #${ids[i]}  ${r.value.title}`);
+  for (const r of result.results) {
+    if (r.status === "updated") {
+      console.log(`  ${chalk9.green("\u2713")} #${r.id}`);
     } else {
-      console.log(`  ${chalk9.red("\u2717")} #${ids[i]}  ${r.reason.message}`);
+      console.log(`  ${chalk9.red("\u2717")} #${r.id}  ${r.error}`);
     }
-  });
+  }
+  console.log(`${chalk9.green(result.updated.toString())} untagged "${tag}", ${result.errors > 0 ? chalk9.red(result.errors.toString()) : "0"} errors`);
 }
 function parseIds(idsStr) {
   return idsStr.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n) && n > 0);
@@ -1136,6 +1107,9 @@ import chalk17 from "chalk";
 import ora16 from "ora";
 var VALID_TYPES = RELATION_TYPES.filter((t) => t !== "duplicate");
 async function linkCommand(sourceId, targetId, opts) {
+  if (opts.batch) {
+    return linkBatchCommand(opts);
+  }
   const config = await getAuthenticatedConfig();
   const src = parseInt(sourceId, 10);
   const tgt = parseInt(targetId, 10);
@@ -1175,6 +1149,47 @@ async function linkCommand(sourceId, targetId, opts) {
     }
     throw err;
   }
+}
+async function linkBatchCommand(opts) {
+  const config = await getAuthenticatedConfig();
+  const chunks = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(chunk);
+  }
+  const input = Buffer.concat(chunks).toString("utf-8").trim();
+  if (!input) {
+    console.error("No input received. Pipe a JSON array to stdin.");
+    console.error(chalk17.dim(`  Example: echo '[{"source_idea_id":1,"target_idea_id":2}]' | nrepo link --batch`));
+    process.exit(1);
+  }
+  let links;
+  try {
+    links = JSON.parse(input);
+    if (!Array.isArray(links)) throw new Error("Input must be a JSON array");
+  } catch (err) {
+    console.error(`Invalid JSON: ${err.message}`);
+    process.exit(1);
+  }
+  if (links.length === 0) {
+    console.error("Empty array \u2014 nothing to link.");
+    process.exit(1);
+  }
+  const spinner = opts.json ? null : ora16(`Creating ${links.length} links...`).start();
+  const result = await createBulkRelations(config, links, opts.force);
+  spinner?.stop();
+  if (opts.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  for (const r of result.results) {
+    if (r.status === "created") {
+      console.log(chalk17.green("\u2713") + ` Linked #${r.source_idea_id} \u2192 #${r.target_idea_id} (${r.relation_type})`);
+    } else {
+      console.log(chalk17.red("\u2717") + ` #${r.source_idea_id} \u2192 #${r.target_idea_id}: ${r.error}`);
+    }
+  }
+  console.log("");
+  console.log(`${chalk17.green(result.linked.toString())} created, ${result.errors > 0 ? chalk17.red(result.errors.toString()) : "0"} errors`);
 }
 async function unlinkCommand(sourceId, targetId, opts) {
   const config = await getAuthenticatedConfig();
@@ -1571,7 +1586,7 @@ tagCmd.argument("[id]").argument("[tags...]").option("--json", "Output as JSON")
 program.command("pull <id>").description("Export idea + context as local files").option("--to <dir>", "Output directory (default: current)").option("--json", "Output as JSON (prints idea data instead of writing files)").option("--human", "Force human-readable output").action(wrap(pullCommand));
 program.command("diff <id> [id2]").description("Compare two ideas side-by-side (or diff against parent/related)").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(diffCommand));
 program.command("branch <id>").description("Fork an idea into a new variant").option("--title <title>", "Override title for the branch").option("--body <body>", "Override body for the branch").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(branchCommand));
-program.command("link <source-id> <target-id>").description("Create a link between two ideas").option("--type <type>", "Link type (related|blocks|inspires|supersedes|parent)", "related").option("--note <note>", "Add a note to the link").option("--force", "Bypass cycle detection for soft-block types").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(linkCommand));
+program.command("link [source-id] [target-id]").description("Create a link between two ideas. Use --batch to pipe a JSON array from stdin.").option("--type <type>", "Link type (related|blocks|inspires|supersedes|parent)", "related").option("--note <note>", "Add a note to the link").option("--force", "Bypass cycle detection for soft-block types").option("--batch", "Bulk mode: read JSON array of links from stdin").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(linkCommand));
 program.command("unlink <source-id> <target-id>").description("Remove a link between two ideas").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(unlinkCommand));
 program.command("links <id>").description("Show all links for an idea").option("--type <type>", "Filter by link type").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(linksCommand));
 program.command("merge <keep-id> <absorb-id>").description("Merge two ideas (absorb the second into the first)").option("--force", "Skip confirmation").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(mergeCommand));

@@ -10,8 +10,13 @@ const VALID_TYPES: readonly string[] = RELATION_TYPES.filter((t) => t !== 'dupli
 export async function linkCommand(
   sourceId: string,
   targetId: string,
-  opts: { type?: string; note?: string; force?: boolean; json?: boolean },
+  opts: { type?: string; note?: string; force?: boolean; json?: boolean; batch?: boolean },
 ): Promise<void> {
+  // Batch mode: nrepo link --batch (reads JSON array from stdin)
+  if (opts.batch) {
+    return linkBatchCommand(opts);
+  }
+
   const config = await getAuthenticatedConfig();
   const src = parseInt(sourceId, 10);
   const tgt = parseInt(targetId, 10);
@@ -57,6 +62,60 @@ export async function linkCommand(
     }
     throw err;
   }
+}
+
+async function linkBatchCommand(
+  opts: { force?: boolean; json?: boolean },
+): Promise<void> {
+  const config = await getAuthenticatedConfig();
+
+  // Read JSON from stdin
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(chunk as Buffer);
+  }
+  const input = Buffer.concat(chunks).toString('utf-8').trim();
+
+  if (!input) {
+    console.error('No input received. Pipe a JSON array to stdin.');
+    console.error(chalk.dim('  Example: echo \'[{"source_idea_id":1,"target_idea_id":2}]\' | nrepo link --batch'));
+    process.exit(1);
+  }
+
+  let links: api.BulkLinkInput[];
+  try {
+    links = JSON.parse(input);
+    if (!Array.isArray(links)) throw new Error('Input must be a JSON array');
+  } catch (err) {
+    console.error(`Invalid JSON: ${(err as Error).message}`);
+    process.exit(1);
+  }
+
+  if (links.length === 0) {
+    console.error('Empty array — nothing to link.');
+    process.exit(1);
+  }
+
+  const spinner = opts.json ? null : ora(`Creating ${links.length} links...`).start();
+
+  const result = await api.createBulkRelations(config, links, opts.force);
+  spinner?.stop();
+
+  if (opts.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  for (const r of result.results) {
+    if (r.status === 'created') {
+      console.log(chalk.green('✓') + ` Linked #${r.source_idea_id} → #${r.target_idea_id} (${r.relation_type})`);
+    } else {
+      console.log(chalk.red('✗') + ` #${r.source_idea_id} → #${r.target_idea_id}: ${r.error}`);
+    }
+  }
+
+  console.log('');
+  console.log(`${chalk.green(result.linked.toString())} created, ${result.errors > 0 ? chalk.red(result.errors.toString()) : '0'} errors`);
 }
 
 export async function unlinkCommand(

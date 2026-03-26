@@ -45,36 +45,22 @@ export async function tagAddCommand(
   }
 
   const spinner = opts.json ? null : ora(`Adding tag "${tag}" to ${ids.length} ideas...`).start();
-
-  const results = await Promise.allSettled(
-    ids.map(async (id) => {
-      const existing = await api.getIdea(config, id);
-      const merged = [...new Set([...existing.tags, tag])];
-      await api.updateIdea(config, id, { tags: merged });
-      return { id, title: existing.title };
-    })
-  );
-
+  const result = await api.bulkUpdateIdeas(config, { ids, add_tags: [tag] });
   spinner?.stop();
 
   if (opts.json) {
-    const output = results.map((r, i) => ({
-      id: ids[i],
-      success: r.status === 'fulfilled',
-      error: r.status === 'rejected' ? (r.reason as Error).message : undefined,
-    }));
-    console.log(JSON.stringify(output, null, 2));
+    console.log(JSON.stringify(result, null, 2));
     return;
   }
 
-  console.log(`Tagged ${ids.length} ideas with "${tag}":`);
-  results.forEach((r, i) => {
-    if (r.status === 'fulfilled') {
-      console.log(`  ${chalk.green('✓')} #${ids[i]}  ${r.value.title}`);
+  for (const r of result.results) {
+    if (r.status === 'updated') {
+      console.log(`  ${chalk.green('✓')} #${r.id}`);
     } else {
-      console.log(`  ${chalk.red('✗')} #${ids[i]}  ${(r.reason as Error).message}`);
+      console.log(`  ${chalk.red('✗')} #${r.id}  ${r.error}`);
     }
-  });
+  }
+  console.log(`${chalk.green(result.updated.toString())} tagged with "${tag}", ${result.errors > 0 ? chalk.red(result.errors.toString()) : '0'} errors`);
 }
 
 export async function tagRemoveCommand(
@@ -90,36 +76,22 @@ export async function tagRemoveCommand(
   }
 
   const spinner = opts.json ? null : ora(`Removing tag "${tag}" from ${ids.length} ideas...`).start();
-
-  const results = await Promise.allSettled(
-    ids.map(async (id) => {
-      const existing = await api.getIdea(config, id);
-      const filtered = existing.tags.filter((t) => t !== tag);
-      await api.updateIdea(config, id, { tags: filtered });
-      return { id, title: existing.title };
-    })
-  );
-
+  const result = await api.bulkUpdateIdeas(config, { ids, remove_tags: [tag] });
   spinner?.stop();
 
   if (opts.json) {
-    const output = results.map((r, i) => ({
-      id: ids[i],
-      success: r.status === 'fulfilled',
-      error: r.status === 'rejected' ? (r.reason as Error).message : undefined,
-    }));
-    console.log(JSON.stringify(output, null, 2));
+    console.log(JSON.stringify(result, null, 2));
     return;
   }
 
-  console.log(`Removed tag "${tag}" from ${ids.length} ideas:`);
-  results.forEach((r, i) => {
-    if (r.status === 'fulfilled') {
-      console.log(`  ${chalk.green('✓')} #${ids[i]}  ${r.value.title}`);
+  for (const r of result.results) {
+    if (r.status === 'updated') {
+      console.log(`  ${chalk.green('✓')} #${r.id}`);
     } else {
-      console.log(`  ${chalk.red('✗')} #${ids[i]}  ${(r.reason as Error).message}`);
+      console.log(`  ${chalk.red('✗')} #${r.id}  ${r.error}`);
     }
-  });
+  }
+  console.log(`${chalk.green(result.updated.toString())} untagged "${tag}", ${result.errors > 0 ? chalk.red(result.errors.toString()) : '0'} errors`);
 }
 
 function parseIds(idsStr: string): number[] {

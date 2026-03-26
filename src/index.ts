@@ -196,11 +196,12 @@ program
 
 // link
 program
-  .command('link <source-id> <target-id>')
-  .description('Create a link between two ideas')
+  .command('link [source-id] [target-id]')
+  .description('Create a link between two ideas. Use --batch to pipe a JSON array from stdin.')
   .option('--type <type>', 'Link type (related|blocks|inspires|supersedes|parent)', 'related')
   .option('--note <note>', 'Add a note to the link')
   .option('--force', 'Bypass cycle detection for soft-block types')
+  .option('--batch', 'Bulk mode: read JSON array of links from stdin')
   .option('--json', 'Output as JSON')
   .option('--human', 'Force human-readable output')
   .action(wrap(linkCommand));
