@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { AuthError, loadConfig } from './config.js';
+import { AuthError } from './config.js';
 import { ApiError } from './api.js';
 import { loginCommand } from './commands/login.js';
 import { whoamiCommand } from './commands/whoami.js';
@@ -52,6 +52,29 @@ program
     await clearConfig();
     console.log('Logged out.');
   }));
+
+// install-skill
+program
+  .command('install-skill')
+  .description('Install the Claude Code skill for NeuralRepo')
+  .action(async () => {
+    const { existsSync, mkdirSync, copyFileSync } = await import('fs');
+    const { homedir } = await import('os');
+    const claudeDir = join(homedir(), '.claude');
+    if (!existsSync(claudeDir)) {
+      console.log(chalk.yellow('Claude Code does not appear to be installed (~/.claude not found).'));
+      console.log('Install Claude Code first, then re-run this command.');
+      process.exitCode = 1;
+      return;
+    }
+    const skillDir = join(claudeDir, 'skills', 'neuralrepo');
+    mkdirSync(skillDir, { recursive: true });
+    const src = join(__dirname, '..', 'skill', 'SKILL.md');
+    const dest = join(skillDir, 'SKILL.md');
+    copyFileSync(src, dest);
+    console.log(chalk.green('Claude Code skill installed.'));
+    console.log(`  ${dest}`);
+  });
 
 // whoami
 program
@@ -333,12 +356,6 @@ function wrap<T extends (...args: never[]) => Promise<void>>(fn: T): T {
         if (o.human) {
           // Explicit --human wins — force human-readable output.
           o.json = false;
-        } else if (!o.json) {
-          // Neither flag set — check auth method for the default.
-          const config = await loadConfig();
-          if (config?.auth_method === 'api-key') {
-            o.json = true;
-          }
         }
         jsonMode = !!o.json;
       }

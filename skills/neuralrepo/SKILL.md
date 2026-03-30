@@ -9,7 +9,7 @@ allowed-tools: Bash(nrepo *)
 
 Capture and manage ideas from the terminal. The `nrepo` CLI connects to the NeuralRepo API.
 
-> **Always use `nrepo` CLI commands instead of the NeuralRepo MCP tools.** The CLI supports more features (relations, links, merge, graph, bulk operations) and composes with unix pipes and redirects.
+> **Note:** The CLI defaults to human-readable output. Always pass `--json` when you need machine-parseable output for piping or programmatic use.
 
 ## Setup
 

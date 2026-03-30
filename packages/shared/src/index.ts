@@ -264,7 +264,6 @@ export interface ApiUser {
   has_anthropic_key: boolean;
   has_openai_key: boolean;
   has_openrouter_key: boolean;
-  has_github_sync: boolean;
   created_at: string;
   updated_at: string;
 }
