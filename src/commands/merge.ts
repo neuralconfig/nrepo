@@ -33,8 +33,8 @@ export async function mergeCommand(
 
   if (!opts.json && !opts.force) {
     console.log(chalk.bold('Merge preview:'));
-    console.log(`  Keep:    #${keep} "${keepIdea.title}" [${keepIdea.status}]`);
-    console.log(`  Absorb:  #${absorb} "${absorbIdea.title}" [${absorbIdea.status}]`);
+    console.log(`  Keep:    #${keepIdea.number} "${keepIdea.title}" [${keepIdea.status}]`);
+    console.log(`  Absorb:  #${absorbIdea.number} "${absorbIdea.title}" [${absorbIdea.status}]`);
     console.log('');
     console.log(chalk.dim('  The absorbed idea will be shelved and archived.'));
     console.log(chalk.dim('  Bodies will be concatenated, tags merged.'));
@@ -50,8 +50,8 @@ export async function mergeCommand(
     return;
   }
 
-  console.log(chalk.green('✓') + ` Merged #${absorb} into #${keep}`);
+  console.log(chalk.green('✓') + ` Merged #${absorbIdea.number} into #${keepIdea.number}`);
   console.log(`  Title: "${result.title}"`);
   console.log(`  Tags: ${result.tags?.length ? result.tags.join(', ') : 'none'}`);
-  console.log(`  #${absorb} "${absorbIdea.title}" → shelved (superseded by #${keep})`);
+  console.log(`  #${absorbIdea.number} "${absorbIdea.title}" → shelved (superseded by #${keepIdea.number})`);
 }

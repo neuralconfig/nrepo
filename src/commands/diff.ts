@@ -113,7 +113,7 @@ function printDiff(a: ApiIdea, b: ApiIdea): void {
   const diffs = computeDiff(a, b);
   const anyChanged = diffs.some((d) => d.changed);
 
-  console.log(chalk.bold(`diff #${a.id} → #${b.id}`));
+  console.log(chalk.bold(`diff #${a.number} → #${b.number}`));
   console.log(chalk.dim('─'.repeat(60)));
 
   if (!anyChanged) {

@@ -191,7 +191,7 @@ export async function linksCommand(
     return;
   }
 
-  console.log(chalk.bold(`Links for #${ideaId} "${idea.title}":`));
+  console.log(chalk.bold(`Links for #${idea.number} "${idea.title}":`));
 
   if (outgoing.length === 0 && incoming.length === 0) {
     console.log(chalk.dim('  No links'));
@@ -230,7 +230,7 @@ export async function linksCommand(
     for (const r of items) {
       const status = chalk.dim(`[${r.idea_status}]`);
       const note = r.note ? chalk.dim(` — ${r.note}`) : '';
-      console.log(`    #${r.idea_id}  ${r.idea_title} ${status}${note}`);
+      console.log(`    #${r.idea_number}  ${r.idea_title} ${status}${note}`);
     }
   }
 
@@ -243,7 +243,7 @@ export async function linksCommand(
     for (const r of items) {
       const status = chalk.dim(`[${r.idea_status}]`);
       const note = r.note ? chalk.dim(` — ${r.note}`) : '';
-      console.log(`    #${r.idea_id}  ${r.idea_title} ${status}${note}`);
+      console.log(`    #${r.idea_number}  ${r.idea_title} ${status}${note}`);
     }
   }
 

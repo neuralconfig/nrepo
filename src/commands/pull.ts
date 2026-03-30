@@ -50,7 +50,7 @@ export async function pullCommand(id: string, opts: { to?: string; json?: boolea
       '',
       ...relations.map((r) => {
         const score = r.score != null ? ` (${(r.score * 100).toFixed(0)}%)` : '';
-        const title = r.related_idea_title ?? `#${r.target_idea_id}`;
+        const title = r.related_idea_title ?? `#${r.related_idea_number ?? r.target_idea_id}`;
         return `- **${r.relation_type}**: ${title}${score}`;
       }),
     ];
@@ -76,6 +76,6 @@ export async function pullCommand(id: string, opts: { to?: string; json?: boolea
   };
   await writeFile(join(dir, '.neuralrepo'), JSON.stringify(syncConfig, null, 2) + '\n', 'utf-8');
 
-  console.log(chalk.green('✓') + ` Pulled #${idea.id} to ${dir}/`);
+  console.log(chalk.green('✓') + ` Pulled #${idea.number} to ${dir}/`);
   console.log(chalk.dim(`  IDEA.md${relations.length ? ', CONTEXT.md' : ''}${links.length ? ', RELATED.md' : ''}, .neuralrepo`));
 }

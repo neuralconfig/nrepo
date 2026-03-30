@@ -133,6 +133,7 @@ export interface GroupedRelation {
   note: string | null;
   created_at: string;
   idea_id: number;
+  idea_number: number;
   idea_title: string;
   idea_status: string;
 }

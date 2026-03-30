@@ -29,7 +29,7 @@ export async function tagCommand(id: string, tags: string[], opts: { json?: bool
     return;
   }
 
-  console.log(chalk.green('✓') + ` #${idea.id} tags: ${idea.tags.join(', ')}`);
+  console.log(chalk.green('✓') + ` #${idea.number} tags: ${idea.tags.join(', ')}`);
 }
 
 export async function tagAddCommand(

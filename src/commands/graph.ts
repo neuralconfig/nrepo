@@ -6,6 +6,7 @@ import type { GroupedRelation } from '../api.js';
 
 interface GraphNode {
   id: number;
+  number: number;
   title: string;
   status: string;
   depth: number;
@@ -43,7 +44,7 @@ export async function graphCommand(
 
   // Fetch the root idea
   const rootIdea = await api.getIdea(config, startId);
-  visited.set(startId, { id: startId, title: rootIdea.title, status: rootIdea.status, depth: 0 });
+  visited.set(startId, { id: startId, number: rootIdea.number, title: rootIdea.title, status: rootIdea.status, depth: 0 });
 
   while (depth < maxDepth && currentLevel.length > 0) {
     const nextLevel: number[] = [];
@@ -64,6 +65,7 @@ export async function graphCommand(
 
         visited.set(neighborId, {
           id: neighborId,
+          number: rel.idea_number,
           title: rel.idea_title,
           status: rel.idea_status,
           depth: depth + 1,
@@ -126,10 +128,10 @@ export async function graphCommand(
     const nodeChildren = children.get(nodeId) ?? [];
 
     if (isRoot) {
-      console.log(`#${node.id} ${node.title} ${style(`[${node.status}]`)}`);
+      console.log(`#${node.number} ${node.title} ${style(`[${node.status}]`)}`);
     } else {
       const parentRel = nodeChildren.length > 0 ? '' : '';
-      console.log(`${prefix}${connector}#${node.id} ${node.title} ${style(`[${node.status}]`)}`);
+      console.log(`${prefix}${connector}#${node.number} ${node.title} ${style(`[${node.status}]`)}`);
     }
 
     for (const [i, child] of nodeChildren.entries()) {
@@ -141,7 +143,7 @@ export async function graphCommand(
       const nextPrefix = prefix + childPrefix + (last ? '    ' : '│   ');
 
       console.log(
-        `${prefix}${childPrefix}${childConnector}${tc(child.type)} → #${child.childId} ${child.title} ${childStyle(`[${childNode.status}]`)}`
+        `${prefix}${childPrefix}${childConnector}${tc(child.type)} → #${childNode.number} ${child.title} ${childStyle(`[${childNode.status}]`)}`
       );
 
       // Recurse into grandchildren
@@ -154,7 +156,7 @@ export async function graphCommand(
         const gcTc = typeColor[gc.type] ?? chalk.white;
         const gcConnector = gcLast ? '└── ' : '├── ';
         console.log(
-          `${nextPrefix}${gcConnector}${gcTc(gc.type)} → #${gc.childId} ${gc.title} ${gcStyle(`[${gcNode.status}]`)}`
+          `${nextPrefix}${gcConnector}${gcTc(gc.type)} → #${gcNode.number} ${gc.title} ${gcStyle(`[${gcNode.status}]`)}`
         );
       }
     }
@@ -163,7 +165,7 @@ export async function graphCommand(
   if (visited.size === 1) {
     const root = visited.get(startId)!;
     const style = statusStyle[root.status] ?? chalk.white;
-    console.log(`#${root.id} ${root.title} ${style(`[${root.status}]`)}`);
+    console.log(`#${root.number} ${root.title} ${style(`[${root.status}]`)}`);
     console.log(chalk.dim('  No connections found'));
   } else {
     renderTree(startId, '', true, true);

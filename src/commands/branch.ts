@@ -38,7 +38,7 @@ export async function branchCommand(
     return;
   }
 
-  console.log(chalk.green('✓') + ` Branched from #${sourceId}`);
+  console.log(chalk.green('✓') + ` Branched from #${sourceId} as #${forked.number}`);
   console.log(formatIdeaRow(forked));
 
   if (forked.processing) {

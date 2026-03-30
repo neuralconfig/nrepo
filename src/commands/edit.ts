@@ -33,7 +33,7 @@ export async function editCommand(
     return;
   }
 
-  console.log(chalk.green('✓') + ` Updated #${updated.id}`);
+  console.log(chalk.green('✓') + ` Updated #${updated.number}`);
   if (opts.title) console.log(`  Title: ${chalk.bold(updated.title)}`);
   if (opts.body) console.log(`  Body updated (${updated.body?.length ?? 0} chars)`);
 }

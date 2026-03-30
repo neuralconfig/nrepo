@@ -413,15 +413,15 @@ function formatIdeaRow(idea) {
   const icon = SOURCE_ICONS[idea.source] ?? "\xB7";
   const tags = idea.tags.length ? chalk3.dim(` [${idea.tags.join(", ")}]`) : "";
   const score = idea.score != null ? chalk3.dim(` (${(idea.score * 100).toFixed(0)}%)`) : "";
-  const id = chalk3.dim(`#${idea.id}`);
+  const num = chalk3.dim(`#${idea.number}`);
   const status = style(idea.status.padEnd(10));
-  return `${id} ${status} ${icon} ${idea.title}${tags}${score}`;
+  return `${num} ${status} ${icon} ${idea.title}${tags}${score}`;
 }
 function formatIdeaDetail(idea) {
   const lines = [];
   const style = statusStyle[idea.status] ?? chalk3.white;
   const icon = SOURCE_ICONS[idea.source] ?? "\xB7";
-  lines.push(chalk3.bold(`#${idea.id}  ${idea.title}`));
+  lines.push(chalk3.bold(`#${idea.number}  ${idea.title}`));
   lines.push("");
   lines.push(`  Status:   ${style(idea.status)}`);
   lines.push(`  Source:   ${icon} ${idea.source}`);
@@ -454,7 +454,7 @@ function formatIdeaDetail(idea) {
     lines.push(chalk3.bold("  Related Ideas"));
     for (const rel of idea.relations) {
       const relScore = rel.score != null ? chalk3.dim(` (${(rel.score * 100).toFixed(0)}%)`) : "";
-      const title = rel.related_idea_title ?? `#${rel.target_idea_id}`;
+      const title = rel.related_idea_title ?? `#${rel.related_idea_number ?? rel.target_idea_id}`;
       lines.push(`    ${chalk3.dim("\xB7")} ${rel.relation_type}: ${title}${relScore}`);
     }
   }
@@ -462,7 +462,7 @@ function formatIdeaDetail(idea) {
 }
 function formatDuplicate(dup2) {
   const score = chalk3.yellow(`${(dup2.similarity_score * 100).toFixed(0)}%`);
-  return `  ${chalk3.dim(`#${dup2.id}`)} ${dup2.idea_title} ${chalk3.dim("\u2248")} ${dup2.duplicate_title} ${score}`;
+  return `  ${chalk3.dim(`#${dup2.idea_number}`)} ${dup2.idea_title} ${chalk3.dim("\u2248")} #${dup2.duplicate_number} ${dup2.duplicate_title} ${score}`;
 }
 function formatDate(iso) {
   const normalized = iso.includes("T") || iso.includes("Z") ? iso : iso.replace(" ", "T") + "Z";
@@ -677,7 +677,7 @@ async function moveCommand(id, status, opts) {
     console.log(JSON.stringify(idea, null, 2));
     return;
   }
-  console.log(chalk8.green("\u2713") + ` #${idea.id} \u2192 ${status}`);
+  console.log(chalk8.green("\u2713") + ` #${idea.number} \u2192 ${status}`);
 }
 async function moveBulkCommand(status, opts) {
   if (!IDEA_STATUSES.includes(status)) {
@@ -730,7 +730,7 @@ async function tagCommand(id, tags, opts) {
     console.log(JSON.stringify(idea, null, 2));
     return;
   }
-  console.log(chalk9.green("\u2713") + ` #${idea.id} tags: ${idea.tags.join(", ")}`);
+  console.log(chalk9.green("\u2713") + ` #${idea.number} tags: ${idea.tags.join(", ")}`);
 }
 async function tagAddCommand(tag, opts) {
   const config = await getAuthenticatedConfig();
@@ -824,7 +824,7 @@ async function pullCommand(id, opts) {
       "",
       ...relations.map((r) => {
         const score = r.score != null ? ` (${(r.score * 100).toFixed(0)}%)` : "";
-        const title = r.related_idea_title ?? `#${r.target_idea_id}`;
+        const title = r.related_idea_title ?? `#${r.related_idea_number ?? r.target_idea_id}`;
         return `- **${r.relation_type}**: ${title}${score}`;
       })
     ];
@@ -845,7 +845,7 @@ async function pullCommand(id, opts) {
     pulled_at: (/* @__PURE__ */ new Date()).toISOString()
   };
   await writeFile2(join2(dir, ".neuralrepo"), JSON.stringify(syncConfig, null, 2) + "\n", "utf-8");
-  console.log(chalk10.green("\u2713") + ` Pulled #${idea.id} to ${dir}/`);
+  console.log(chalk10.green("\u2713") + ` Pulled #${idea.number} to ${dir}/`);
   console.log(chalk10.dim(`  IDEA.md${relations.length ? ", CONTEXT.md" : ""}${links.length ? ", RELATED.md" : ""}, .neuralrepo`));
 }
 
@@ -924,7 +924,7 @@ function computeDiff(a, b) {
 function printDiff(a, b) {
   const diffs = computeDiff(a, b);
   const anyChanged = diffs.some((d) => d.changed);
-  console.log(chalk11.bold(`diff #${a.id} \u2192 #${b.id}`));
+  console.log(chalk11.bold(`diff #${a.number} \u2192 #${b.number}`));
   console.log(chalk11.dim("\u2500".repeat(60)));
   if (!anyChanged) {
     console.log(chalk11.dim("  No differences found."));
@@ -984,7 +984,7 @@ async function branchCommand(id, opts) {
     console.log(JSON.stringify(forked, null, 2));
     return;
   }
-  console.log(chalk12.green("\u2713") + ` Branched from #${sourceId}`);
+  console.log(chalk12.green("\u2713") + ` Branched from #${sourceId} as #${forked.number}`);
   console.log(formatIdeaRow(forked));
   if (forked.processing) {
     console.log(chalk12.dim("\n  Processing: embeddings, dedup, and auto-tagging queued"));
@@ -1017,7 +1017,7 @@ async function editCommand(id, opts) {
     console.log(JSON.stringify(updated, null, 2));
     return;
   }
-  console.log(chalk13.green("\u2713") + ` Updated #${updated.id}`);
+  console.log(chalk13.green("\u2713") + ` Updated #${updated.number}`);
   if (opts.title) console.log(`  Title: ${chalk13.bold(updated.title)}`);
   if (opts.body) console.log(`  Body updated (${updated.body?.length ?? 0} chars)`);
 }
@@ -1089,7 +1089,7 @@ async function rmCommand(id, opts) {
   spinner?.stop();
   if (!opts.json && !opts.force) {
     console.log(chalk15.bold("Archive preview:"));
-    console.log(`  #${ideaId} "${idea.title}" [${idea.status}]`);
+    console.log(`  #${idea.number} "${idea.title}" [${idea.status}]`);
     console.log("");
     console.log(chalk15.dim("  The idea will be archived (soft-deleted)."));
     console.log("");
@@ -1101,7 +1101,7 @@ async function rmCommand(id, opts) {
     console.log(JSON.stringify({ success: true, archived: ideaId }));
     return;
   }
-  console.log(chalk15.green("\u2713") + ` Archived #${ideaId} "${idea.title}"`);
+  console.log(chalk15.green("\u2713") + ` Archived #${idea.number} "${idea.title}"`);
 }
 
 // src/commands/duplicate.ts
@@ -1301,7 +1301,7 @@ async function linksCommand(id, opts) {
     console.log(JSON.stringify({ outgoing, incoming }, null, 2));
     return;
   }
-  console.log(chalk17.bold(`Links for #${ideaId} "${idea.title}":`));
+  console.log(chalk17.bold(`Links for #${idea.number} "${idea.title}":`));
   if (outgoing.length === 0 && incoming.length === 0) {
     console.log(chalk17.dim("  No links"));
     return;
@@ -1333,7 +1333,7 @@ async function linksCommand(id, opts) {
     for (const r of items) {
       const status = chalk17.dim(`[${r.idea_status}]`);
       const note = r.note ? chalk17.dim(` \u2014 ${r.note}`) : "";
-      console.log(`    #${r.idea_id}  ${r.idea_title} ${status}${note}`);
+      console.log(`    #${r.idea_number}  ${r.idea_title} ${status}${note}`);
     }
   }
   for (const [type, items] of inByType) {
@@ -1344,7 +1344,7 @@ async function linksCommand(id, opts) {
     for (const r of items) {
       const status = chalk17.dim(`[${r.idea_status}]`);
       const note = r.note ? chalk17.dim(` \u2014 ${r.note}`) : "";
-      console.log(`    #${r.idea_id}  ${r.idea_title} ${status}${note}`);
+      console.log(`    #${r.idea_number}  ${r.idea_title} ${status}${note}`);
     }
   }
   console.log("");
@@ -1373,8 +1373,8 @@ async function mergeCommand(keepId, absorbId, opts) {
   spinner?.stop();
   if (!opts.json && !opts.force) {
     console.log(chalk18.bold("Merge preview:"));
-    console.log(`  Keep:    #${keep} "${keepIdea.title}" [${keepIdea.status}]`);
-    console.log(`  Absorb:  #${absorb} "${absorbIdea.title}" [${absorbIdea.status}]`);
+    console.log(`  Keep:    #${keepIdea.number} "${keepIdea.title}" [${keepIdea.status}]`);
+    console.log(`  Absorb:  #${absorbIdea.number} "${absorbIdea.title}" [${absorbIdea.status}]`);
     console.log("");
     console.log(chalk18.dim("  The absorbed idea will be shelved and archived."));
     console.log(chalk18.dim("  Bodies will be concatenated, tags merged."));
@@ -1387,10 +1387,10 @@ async function mergeCommand(keepId, absorbId, opts) {
     console.log(JSON.stringify(result, null, 2));
     return;
   }
-  console.log(chalk18.green("\u2713") + ` Merged #${absorb} into #${keep}`);
+  console.log(chalk18.green("\u2713") + ` Merged #${absorbIdea.number} into #${keepIdea.number}`);
   console.log(`  Title: "${result.title}"`);
   console.log(`  Tags: ${result.tags?.length ? result.tags.join(", ") : "none"}`);
-  console.log(`  #${absorb} "${absorbIdea.title}" \u2192 shelved (superseded by #${keep})`);
+  console.log(`  #${absorbIdea.number} "${absorbIdea.title}" \u2192 shelved (superseded by #${keepIdea.number})`);
 }
 
 // src/commands/graph.ts
@@ -1412,7 +1412,7 @@ async function graphCommand(id, opts) {
   let currentLevel = [startId];
   let depth = 0;
   const rootIdea = await getIdea(config, startId);
-  visited.set(startId, { id: startId, title: rootIdea.title, status: rootIdea.status, depth: 0 });
+  visited.set(startId, { id: startId, number: rootIdea.number, title: rootIdea.title, status: rootIdea.status, depth: 0 });
   while (depth < maxDepth && currentLevel.length > 0) {
     const nextLevel = [];
     for (const nodeId of currentLevel) {
@@ -1427,6 +1427,7 @@ async function graphCommand(id, opts) {
         if (visited.has(neighborId)) continue;
         visited.set(neighborId, {
           id: neighborId,
+          number: rel.idea_number,
           title: rel.idea_title,
           status: rel.idea_status,
           depth: depth + 1
@@ -1476,10 +1477,10 @@ async function graphCommand(id, opts) {
     const childPrefix = isRoot ? "" : isLast ? "    " : "\u2502   ";
     const nodeChildren = children.get(nodeId) ?? [];
     if (isRoot) {
-      console.log(`#${node.id} ${node.title} ${style(`[${node.status}]`)}`);
+      console.log(`#${node.number} ${node.title} ${style(`[${node.status}]`)}`);
     } else {
       const parentRel = nodeChildren.length > 0 ? "" : "";
-      console.log(`${prefix}${connector}#${node.id} ${node.title} ${style(`[${node.status}]`)}`);
+      console.log(`${prefix}${connector}#${node.number} ${node.title} ${style(`[${node.status}]`)}`);
     }
     for (const [i, child] of nodeChildren.entries()) {
       const last = i === nodeChildren.length - 1;
@@ -1489,7 +1490,7 @@ async function graphCommand(id, opts) {
       const childConnector = last ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ";
       const nextPrefix = prefix + childPrefix + (last ? "    " : "\u2502   ");
       console.log(
-        `${prefix}${childPrefix}${childConnector}${tc(child.type)} \u2192 #${child.childId} ${child.title} ${childStyle(`[${childNode.status}]`)}`
+        `${prefix}${childPrefix}${childConnector}${tc(child.type)} \u2192 #${childNode.number} ${child.title} ${childStyle(`[${childNode.status}]`)}`
       );
       const grandchildren = children.get(child.childId) ?? [];
       for (const [j, gc] of grandchildren.entries()) {
@@ -1500,7 +1501,7 @@ async function graphCommand(id, opts) {
         const gcTc = typeColor[gc.type] ?? chalk19.white;
         const gcConnector = gcLast ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ";
         console.log(
-          `${nextPrefix}${gcConnector}${gcTc(gc.type)} \u2192 #${gc.childId} ${gc.title} ${gcStyle(`[${gcNode.status}]`)}`
+          `${nextPrefix}${gcConnector}${gcTc(gc.type)} \u2192 #${gcNode.number} ${gc.title} ${gcStyle(`[${gcNode.status}]`)}`
         );
       }
     }
@@ -1508,7 +1509,7 @@ async function graphCommand(id, opts) {
   if (visited.size === 1) {
     const root = visited.get(startId);
     const style = statusStyle3[root.status] ?? chalk19.white;
-    console.log(`#${root.id} ${root.title} ${style(`[${root.status}]`)}`);
+    console.log(`#${root.number} ${root.title} ${style(`[${root.status}]`)}`);
     console.log(chalk19.dim("  No connections found"));
   } else {
     renderTree(startId, "", true, true);

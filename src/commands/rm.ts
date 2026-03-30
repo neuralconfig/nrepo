@@ -22,7 +22,7 @@ export async function rmCommand(
 
   if (!opts.json && !opts.force) {
     console.log(chalk.bold('Archive preview:'));
-    console.log(`  #${ideaId} "${idea.title}" [${idea.status}]`);
+    console.log(`  #${idea.number} "${idea.title}" [${idea.status}]`);
     console.log('');
     console.log(chalk.dim('  The idea will be archived (soft-deleted).'));
     console.log('');
@@ -37,5 +37,5 @@ export async function rmCommand(
     return;
   }
 
-  console.log(chalk.green('✓') + ` Archived #${ideaId} "${idea.title}"`);
+  console.log(chalk.green('✓') + ` Archived #${idea.number} "${idea.title}"`);
 }

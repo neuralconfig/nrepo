@@ -183,6 +183,7 @@ export type CreateUrlLinkInput = z.infer<typeof CreateUrlLinkSchema>;
 
 export interface ApiIdea {
   id: number;
+  number: number;
   title: string;
   body: string | null;
   status: IdeaStatus;
@@ -215,6 +216,7 @@ export interface ApiIdeaRelation {
   score: number | null;
   note: string | null;
   related_idea_title?: string;
+  related_idea_number?: number;
 }
 
 export interface ApiGroupedRelation {
@@ -223,12 +225,10 @@ export interface ApiGroupedRelation {
   score: number | null;
   note: string | null;
   created_at: string;
-  idea: {
-    id: number;
-    title: string;
-    status: IdeaStatus;
-    tags: string[];
-  };
+  idea_id: number;
+  idea_number: number;
+  idea_title: string;
+  idea_status: IdeaStatus;
 }
 
 export interface ApiGroupedRelations {
@@ -244,6 +244,8 @@ export interface ApiDuplicateDetection {
   status: DuplicateStatus;
   idea_title: string;
   duplicate_title: string;
+  idea_number: number;
+  duplicate_number: number;
   created_at: string;
 }
 

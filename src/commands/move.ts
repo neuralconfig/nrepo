@@ -27,7 +27,7 @@ export async function moveCommand(id: string, status: string, opts: { json?: boo
     return;
   }
 
-  console.log(chalk.green('✓') + ` #${idea.id} → ${status}`);
+  console.log(chalk.green('✓') + ` #${idea.number} → ${status}`);
 }
 
 export async function moveBulkCommand(

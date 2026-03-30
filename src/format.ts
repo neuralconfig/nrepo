@@ -15,9 +15,9 @@ export function formatIdeaRow(idea: ApiIdea): string {
   const icon = SOURCE_ICONS[idea.source] ?? '·';
   const tags = idea.tags.length ? chalk.dim(` [${idea.tags.join(', ')}]`) : '';
   const score = idea.score != null ? chalk.dim(` (${(idea.score * 100).toFixed(0)}%)`) : '';
-  const id = chalk.dim(`#${idea.id}`);
+  const num = chalk.dim(`#${idea.number}`);
   const status = style(idea.status.padEnd(10));
-  return `${id} ${status} ${icon} ${idea.title}${tags}${score}`;
+  return `${num} ${status} ${icon} ${idea.title}${tags}${score}`;
 }
 
 export function formatIdeaDetail(idea: ApiIdea & { links?: ApiIdeaLink[]; relations?: ApiIdeaRelation[] }): string {
@@ -25,7 +25,7 @@ export function formatIdeaDetail(idea: ApiIdea & { links?: ApiIdeaLink[]; relati
   const style = statusStyle[idea.status] ?? chalk.white;
   const icon = SOURCE_ICONS[idea.source] ?? '·';
 
-  lines.push(chalk.bold(`#${idea.id}  ${idea.title}`));
+  lines.push(chalk.bold(`#${idea.number}  ${idea.title}`));
   lines.push('');
   lines.push(`  Status:   ${style(idea.status)}`);
   lines.push(`  Source:   ${icon} ${idea.source}`);
@@ -63,7 +63,7 @@ export function formatIdeaDetail(idea: ApiIdea & { links?: ApiIdeaLink[]; relati
     lines.push(chalk.bold('  Related Ideas'));
     for (const rel of idea.relations) {
       const relScore = rel.score != null ? chalk.dim(` (${(rel.score * 100).toFixed(0)}%)`) : '';
-      const title = rel.related_idea_title ?? `#${rel.target_idea_id}`;
+      const title = rel.related_idea_title ?? `#${rel.related_idea_number ?? rel.target_idea_id}`;
       lines.push(`    ${chalk.dim('·')} ${rel.relation_type}: ${title}${relScore}`);
     }
   }
@@ -73,7 +73,7 @@ export function formatIdeaDetail(idea: ApiIdea & { links?: ApiIdeaLink[]; relati
 
 export function formatDuplicate(dup: ApiDuplicateDetection): string {
   const score = chalk.yellow(`${(dup.similarity_score * 100).toFixed(0)}%`);
-  return `  ${chalk.dim(`#${dup.id}`)} ${dup.idea_title} ${chalk.dim('≈')} ${dup.duplicate_title} ${score}`;
+  return `  ${chalk.dim(`#${dup.idea_number}`)} ${dup.idea_title} ${chalk.dim('≈')} #${dup.duplicate_number} ${dup.duplicate_title} ${score}`;
 }
 
 export function formatDate(iso: string): string {
