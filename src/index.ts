@@ -330,21 +330,32 @@ keys
   .option('--human', 'Force human-readable output')
   .action(wrap(keysRevokeCommand));
 
-// First-run welcome (npm suppresses postinstall output, so show it here)
+// First-run welcome (npm suppresses postinstall output, so show it after help)
 import { existsSync } from 'fs';
 import { homedir } from 'os';
 const configExists = existsSync(join(homedir(), '.config', 'neuralrepo', 'config.json'));
-if (!configExists && (process.argv.length <= 2 || process.argv[2] === '--help')) {
-  console.log('');
-  console.log(`  ${chalk.bold('nrepo')} installed ${chalk.green('✓')}`);
-  console.log('');
-  console.log('  Get started:');
-  console.log(`    ${chalk.green('nrepo login')}                        Log in to NeuralRepo`);
-  console.log('');
-  console.log('  Then try:');
-  console.log(`    nrepo push "Build a Siri shortcut"  Save an idea`);
-  console.log(`    nrepo search "siri"                 Find it later`);
-  console.log('');
+if (!configExists) {
+  program.addHelpText('afterAll', () => {
+    const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
+    const lines = [
+      `${chalk.bold('nrepo')} installed ${chalk.green('✓')}`,
+      '',
+      'Get started:',
+      `  ${chalk.green('nrepo login')}                        Log in to NeuralRepo`,
+      '',
+      'Then try:',
+      `  nrepo push "Build a Siri shortcut"  Save an idea`,
+      `  nrepo search "siri"                 Find it later`,
+    ];
+    const inner = Math.max(...lines.map(l => strip(l).length));
+    const top = `  ┌──${'─'.repeat(inner)}──┐`;
+    const bot = `  └──${'─'.repeat(inner)}──┘`;
+    const boxLines = lines.map(l => {
+      const padding = inner - strip(l).length;
+      return `  │  ${l}${' '.repeat(padding)}  │`;
+    });
+    return '\n' + top + '\n' + boxLines.join('\n') + '\n' + bot;
+  });
 }
 
 // Non-blocking update check (reads cache, prints notice, fetches in background)

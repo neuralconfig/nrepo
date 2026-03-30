@@ -1685,17 +1685,28 @@ keys.command("list").description("List all API keys").option("--json", "Output a
 keys.command("create <label>").description("Create a new API key").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysCreateCommand));
 keys.command("revoke <key-id>").description("Revoke an API key").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysRevokeCommand));
 var configExists = existsSync3(join4(homedir3(), ".config", "neuralrepo", "config.json"));
-if (!configExists && (process.argv.length <= 2 || process.argv[2] === "--help")) {
-  console.log("");
-  console.log(`  ${chalk21.bold("nrepo")} installed ${chalk21.green("\u2713")}`);
-  console.log("");
-  console.log("  Get started:");
-  console.log(`    ${chalk21.green("nrepo login")}                        Log in to NeuralRepo`);
-  console.log("");
-  console.log("  Then try:");
-  console.log(`    nrepo push "Build a Siri shortcut"  Save an idea`);
-  console.log(`    nrepo search "siri"                 Find it later`);
-  console.log("");
+if (!configExists) {
+  program.addHelpText("afterAll", () => {
+    const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
+    const lines = [
+      `${chalk21.bold("nrepo")} installed ${chalk21.green("\u2713")}`,
+      "",
+      "Get started:",
+      `  ${chalk21.green("nrepo login")}                        Log in to NeuralRepo`,
+      "",
+      "Then try:",
+      `  nrepo push "Build a Siri shortcut"  Save an idea`,
+      `  nrepo search "siri"                 Find it later`
+    ];
+    const inner = Math.max(...lines.map((l) => strip(l).length));
+    const top = `  \u250C\u2500\u2500${"\u2500".repeat(inner)}\u2500\u2500\u2510`;
+    const bot = `  \u2514\u2500\u2500${"\u2500".repeat(inner)}\u2500\u2500\u2518`;
+    const boxLines = lines.map((l) => {
+      const padding = inner - strip(l).length;
+      return `  \u2502  ${l}${" ".repeat(padding)}  \u2502`;
+    });
+    return "\n" + top + "\n" + boxLines.join("\n") + "\n" + bot;
+  });
 }
 checkForUpdates(VERSION);
 program.parse();
