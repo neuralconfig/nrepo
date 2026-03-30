@@ -88,6 +88,7 @@ export const UserSettingsSchema = z.object({
   search_threshold: z.number().min(0.1).max(0.9).optional(),
   dedup_threshold: z.number().min(0.1).max(0.9).optional(),
   related_threshold: z.number().min(0.1).max(0.9).optional(),
+  code_mode: z.boolean().optional(),
 });
 
 export type UserSettings = z.infer<typeof UserSettingsSchema>;
