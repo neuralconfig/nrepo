@@ -330,6 +330,23 @@ keys
   .option('--human', 'Force human-readable output')
   .action(wrap(keysRevokeCommand));
 
+// First-run welcome (npm suppresses postinstall output, so show it here)
+import { existsSync } from 'fs';
+import { homedir } from 'os';
+const configExists = existsSync(join(homedir(), '.config', 'neuralrepo', 'config.json'));
+if (!configExists && (process.argv.length <= 2 || process.argv[2] === '--help')) {
+  console.log('');
+  console.log(`  ${chalk.bold('nrepo')} installed ${chalk.green('✓')}`);
+  console.log('');
+  console.log('  Get started:');
+  console.log(`    ${chalk.green('nrepo login')}                        Log in to NeuralRepo`);
+  console.log('');
+  console.log('  Then try:');
+  console.log(`    nrepo push "Build a Siri shortcut"  Save an idea`);
+  console.log(`    nrepo search "siri"                 Find it later`);
+  console.log('');
+}
+
 // Non-blocking update check (reads cache, prints notice, fetches in background)
 checkForUpdates(VERSION);
 

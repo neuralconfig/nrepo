@@ -1613,6 +1613,8 @@ async function updateSkillFile() {
 import { readFileSync as readFileSync2 } from "fs";
 import { fileURLToPath as fileURLToPath2 } from "url";
 import { dirname as dirname2, join as join4 } from "path";
+import { existsSync as existsSync3 } from "fs";
+import { homedir as homedir3 } from "os";
 var __dirname = dirname2(fileURLToPath2(import.meta.url));
 var VERSION = JSON.parse(readFileSync2(join4(__dirname, "..", "package.json"), "utf8")).version;
 var program = new Command();
@@ -1623,10 +1625,10 @@ program.command("logout").description("Clear stored credentials").action(wrap(as
   console.log("Logged out.");
 }));
 program.command("install-skill").description("Install the Claude Code skill for NeuralRepo").action(async () => {
-  const { existsSync: existsSync3, mkdirSync, copyFileSync } = await import("fs");
-  const { homedir: homedir3 } = await import("os");
-  const claudeDir = join4(homedir3(), ".claude");
-  if (!existsSync3(claudeDir)) {
+  const { existsSync: existsSync4, mkdirSync, copyFileSync } = await import("fs");
+  const { homedir: homedir4 } = await import("os");
+  const claudeDir = join4(homedir4(), ".claude");
+  if (!existsSync4(claudeDir)) {
     console.log(chalk21.yellow("Claude Code does not appear to be installed (~/.claude not found)."));
     console.log("Install Claude Code first, then re-run this command.");
     process.exitCode = 1;
@@ -1682,6 +1684,19 @@ var keys = program.command("key").description("Manage API keys");
 keys.command("list").description("List all API keys").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysListCommand));
 keys.command("create <label>").description("Create a new API key").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysCreateCommand));
 keys.command("revoke <key-id>").description("Revoke an API key").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysRevokeCommand));
+var configExists = existsSync3(join4(homedir3(), ".config", "neuralrepo", "config.json"));
+if (!configExists && (process.argv.length <= 2 || process.argv[2] === "--help")) {
+  console.log("");
+  console.log(`  ${chalk21.bold("nrepo")} installed ${chalk21.green("\u2713")}`);
+  console.log("");
+  console.log("  Get started:");
+  console.log(`    ${chalk21.green("nrepo login")}                        Log in to NeuralRepo`);
+  console.log("");
+  console.log("  Then try:");
+  console.log(`    nrepo push "Build a Siri shortcut"  Save an idea`);
+  console.log(`    nrepo search "siri"                 Find it later`);
+  console.log("");
+}
 checkForUpdates(VERSION);
 program.parse();
 function collect(value, previous) {
