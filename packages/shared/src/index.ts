@@ -89,6 +89,8 @@ export const UserSettingsSchema = z.object({
   dedup_threshold: z.number().min(0.1).max(0.9).optional(),
   related_threshold: z.number().min(0.1).max(0.9).optional(),
   code_mode: z.boolean().optional(),
+  // Absent = opted in; only an explicit false suppresses the weekly digest
+  weekly_digest: z.boolean().optional(),
 });
 
 export type UserSettings = z.infer<typeof UserSettingsSchema>;

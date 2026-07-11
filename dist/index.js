@@ -348,7 +348,9 @@ var UserSettingsSchema = z.object({
   search_threshold: z.number().min(0.1).max(0.9).optional(),
   dedup_threshold: z.number().min(0.1).max(0.9).optional(),
   related_threshold: z.number().min(0.1).max(0.9).optional(),
-  code_mode: z.boolean().optional()
+  code_mode: z.boolean().optional(),
+  // Absent = opted in; only an explicit false suppresses the weekly digest
+  weekly_digest: z.boolean().optional()
 });
 var CreateIdeaSchema = z.object({
   title: z.string().min(1).max(LIMITS.IDEA_TITLE_MAX),
