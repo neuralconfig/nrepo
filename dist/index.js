@@ -350,7 +350,11 @@ var UserSettingsSchema = z.object({
   related_threshold: z.number().min(0.1).max(0.9).optional(),
   code_mode: z.boolean().optional(),
   // Absent = opted in; only an explicit false suppresses the weekly digest
-  weekly_digest: z.boolean().optional()
+  weekly_digest: z.boolean().optional(),
+  // Absent = opted in; only an explicit false suppresses stale-idea nudge emails
+  stale_nudges: z.boolean().optional(),
+  // Days before a "captured" idea counts as stale (digest flags + nudge emails)
+  stale_threshold_days: z.number().int().min(7).max(180).optional()
 });
 var CreateIdeaSchema = z.object({
   title: z.string().min(1).max(LIMITS.IDEA_TITLE_MAX),

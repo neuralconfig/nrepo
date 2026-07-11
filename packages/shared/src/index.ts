@@ -91,7 +91,13 @@ export const UserSettingsSchema = z.object({
   code_mode: z.boolean().optional(),
   // Absent = opted in; only an explicit false suppresses the weekly digest
   weekly_digest: z.boolean().optional(),
+  // Absent = opted in; only an explicit false suppresses stale-idea nudge emails
+  stale_nudges: z.boolean().optional(),
+  // Days before a "captured" idea counts as stale (digest flags + nudge emails)
+  stale_threshold_days: z.number().int().min(7).max(180).optional(),
 });
+
+export const DEFAULT_STALE_THRESHOLD_DAYS = 30;
 
 export type UserSettings = z.infer<typeof UserSettingsSchema>;
 
