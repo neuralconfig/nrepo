@@ -307,7 +307,7 @@ import chalk3 from "chalk";
 // ../packages/shared/src/index.ts
 import { z } from "zod";
 var IDEA_STATUSES = ["captured", "exploring", "building", "shipped", "shelved"];
-var IDEA_SOURCES = ["web", "cli", "claude-mcp", "siri", "email", "api", "shortcut"];
+var IDEA_SOURCES = ["web", "cli", "claude-mcp", "siri", "email", "api", "shortcut", "ios"];
 var LINK_TYPES = ["url", "claude-chat", "github-repo", "github-issue", "attachment"];
 var RELATION_TYPES = ["related", "parent", "blocks", "inspires", "duplicate", "supersedes"];
 var SOURCE_ICONS = {
@@ -317,7 +317,8 @@ var SOURCE_ICONS = {
   cli: "\u2B21",
   email: "\u2709",
   api: "\u2699",
-  shortcut: "\u2318"
+  shortcut: "\u2318",
+  ios: "\u2B22"
 };
 var LIMITS = {
   /** Max characters for idea title */

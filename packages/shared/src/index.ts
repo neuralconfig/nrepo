@@ -10,7 +10,7 @@ import { z } from 'zod';
 // ============================================================
 
 export const IDEA_STATUSES = ['captured', 'exploring', 'building', 'shipped', 'shelved'] as const;
-export const IDEA_SOURCES = ['web', 'cli', 'claude-mcp', 'siri', 'email', 'api', 'shortcut'] as const;
+export const IDEA_SOURCES = ['web', 'cli', 'claude-mcp', 'siri', 'email', 'api', 'shortcut', 'ios'] as const;
 export const LINK_TYPES = ['url', 'claude-chat', 'github-repo', 'github-issue', 'attachment'] as const;
 export const RELATION_TYPES = ['related', 'parent', 'blocks', 'inspires', 'duplicate', 'supersedes'] as const;
 export const DUPLICATE_STATUSES = ['pending', 'merged', 'dismissed'] as const;
@@ -35,6 +35,7 @@ export const SOURCE_ICONS: Record<IdeaSource, string> = {
   email: '✉',
   api: '⚙',
   shortcut: '⌘',
+  ios: '⬢',
 };
 
 // ============================================================
