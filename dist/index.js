@@ -1692,6 +1692,8 @@ var keys = program.command("key").description("Manage API keys");
 keys.command("list").description("List all API keys").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysListCommand));
 keys.command("create <label>").description("Create a new API key").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysCreateCommand));
 keys.command("revoke <key-id>").description("Revoke an API key").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysRevokeCommand));
+program.addHelpText("after", `
+Help and support: https://support.neuralconfig.com/neuralrepo?from=app&platform=cli&v=${VERSION}`);
 var configExists = existsSync3(join4(homedir3(), ".config", "neuralrepo", "config.json"));
 if (!configExists) {
   program.addHelpText("afterAll", () => {

@@ -330,6 +330,8 @@ keys
   .option('--human', 'Force human-readable output')
   .action(wrap(keysRevokeCommand));
 
+program.addHelpText('after', `\nHelp and support: https://support.neuralconfig.com/neuralrepo?from=app&platform=cli&v=${VERSION}`);
+
 // First-run welcome (npm suppresses postinstall output, so show it after help)
 import { existsSync } from 'fs';
 import { homedir } from 'os';
