@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { getAuthenticatedConfig } from '../config.js';
 import * as api from '../api.js';
+import { resolveIdea } from '../ids.js';
 import type { GroupedRelation } from '../api.js';
 
 interface GraphNode {
@@ -23,12 +24,7 @@ export async function graphCommand(
   opts: { depth?: string; type?: string; json?: boolean },
 ): Promise<void> {
   const config = await getAuthenticatedConfig();
-  const startId = parseInt(id, 10);
-
-  if (isNaN(startId)) {
-    console.error('Invalid idea ID');
-    process.exit(1);
-  }
+  const { id: startId } = await resolveIdea(config, id);
 
   const maxDepth = Math.min(parseInt(opts.depth ?? '1', 10), 5);
   const typeFilter = opts.type?.split(',');

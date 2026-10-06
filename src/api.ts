@@ -1,4 +1,5 @@
 import type { Config } from './config.js';
+import { VERSION } from './version.js';
 import type {
   ApiIdea,
   ApiUser,
@@ -29,11 +30,33 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Turns an API error body into one line. Most errors are `{ error: string }`,
+ * but validation 400s are `{ error: { field: [messages] } }`, which used to
+ * print as `[object Object]`.
+ */
+export function apiErrorMessage(body: unknown, status: number): string {
+  const error = (body as { error?: unknown } | null)?.error;
+  if (typeof error === 'string' && error) return error;
+  if (error && typeof error === 'object') {
+    const parts = Object.entries(error as Record<string, unknown>).map(([field, msgs]) => {
+      const text = Array.isArray(msgs) ? msgs.join(', ') : String(msgs);
+      return field ? `${field}: ${text}` : text;
+    });
+    if (parts.length > 0) return parts.join('; ');
+  }
+  return `HTTP ${status}`;
+}
+
+/** Identifies the CLI and its version to the server (usage analytics, support). */
+export const CLIENT_HEADER = { 'X-NeuralRepo-Client': `cli/${VERSION}` };
+
 async function request<T>(config: Config, method: string, path: string, body?: unknown): Promise<T> {
   const url = `${config.api_url}${path}`;
   const headers: Record<string, string> = {
     'X-API-Key': config.api_key,
     'Content-Type': 'application/json',
+    ...CLIENT_HEADER,
   };
 
   let res: Response;
@@ -52,7 +75,7 @@ async function request<T>(config: Config, method: string, path: string, body?: u
   if (!res.ok) {
     const json = await res.json().catch(() => ({ error: res.statusText }));
     throw new ApiError(
-      (json as { error?: string }).error ?? `HTTP ${res.status}`,
+      apiErrorMessage(json, res.status),
       res.status,
       json as Record<string, unknown>,
     );
@@ -77,6 +100,11 @@ export const listIdeas = (c: Config, params?: { status?: string; tag?: string; l
 
 export const createIdea = (c: Config, data: CreateIdeaInput) =>
   request<ApiIdea & { processing?: boolean }>(c, 'POST', '/ideas', data);
+
+export const resolveIdeaNumbers = (c: Config, numbers: number[]) =>
+  request<{ results: { number: number; id: number }[] }>(
+    c, 'GET', `/ideas/by-number?numbers=${numbers.join(',')}`,
+  );
 
 export const getIdea = (c: Config, id: number) =>
   request<ApiIdea & { links: ApiIdeaLink[]; relations: ApiIdeaRelation[] }>(c, 'GET', `/ideas/${id}`);

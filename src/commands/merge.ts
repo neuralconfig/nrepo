@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { getAuthenticatedConfig } from '../config.js';
 import * as api from '../api.js';
+import { resolveIdeaPair } from '../ids.js';
 import { formatIdeaDetail } from '../format.js';
 
 export async function mergeCommand(
@@ -10,13 +11,8 @@ export async function mergeCommand(
   opts: { json?: boolean; force?: boolean },
 ): Promise<void> {
   const config = await getAuthenticatedConfig();
-  const keep = parseInt(keepId, 10);
-  const absorb = parseInt(absorbId, 10);
-
-  if (isNaN(keep) || isNaN(absorb)) {
-    console.error('Invalid idea IDs');
-    process.exit(1);
-  }
+  const [{ id: keep }, { id: absorb }] =
+    await resolveIdeaPair(config, keepId, absorbId);
 
   if (keep === absorb) {
     console.error('Cannot merge an idea with itself');

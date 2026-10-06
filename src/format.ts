@@ -73,7 +73,8 @@ export function formatIdeaDetail(idea: ApiIdea & { links?: ApiIdeaLink[]; relati
 
 export function formatDuplicate(dup: ApiDuplicateDetection): string {
   const score = chalk.yellow(`${(dup.similarity_score * 100).toFixed(0)}%`);
-  return `  ${chalk.dim(`#${dup.idea_number}`)} ${dup.idea_title} ${chalk.dim('≈')} #${dup.duplicate_number} ${dup.duplicate_title} ${score}`;
+  // The leading id is the detection id that `duplicate dismiss|merge <id>` take.
+  return `  ${chalk.cyan(String(dup.id).padStart(4))}  ${chalk.dim(`#${dup.idea_number}`)} ${dup.idea_title} ${chalk.dim('≈')} #${dup.duplicate_number} ${dup.duplicate_title} ${score}`;
 }
 
 export function formatDate(iso: string): string {

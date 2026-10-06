@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { getAuthenticatedConfig } from '../config.js';
 import * as api from '../api.js';
+import { resolveIdea, resolveIdeaList, labelFor } from '../ids.js';
 import { IDEA_STATUSES } from '@neuralrepo/shared';
 import type { IdeaStatus } from '@neuralrepo/shared';
 
@@ -12,11 +13,7 @@ export async function moveCommand(id: string, status: string, opts: { json?: boo
   }
 
   const config = await getAuthenticatedConfig();
-  const ideaId = parseInt(id, 10);
-  if (isNaN(ideaId)) {
-    console.error('Invalid idea ID');
-    process.exit(1);
-  }
+  const { id: ideaId } = await resolveIdea(config, id);
 
   const spinner = opts.json ? null : ora('Updating status...').start();
   const idea = await api.updateIdea(config, ideaId, { status: status as IdeaStatus });
@@ -40,15 +37,8 @@ export async function moveBulkCommand(
   }
 
   const config = await getAuthenticatedConfig();
-  const ids = opts.ids
-    .split(',')
-    .map((s) => parseInt(s.trim(), 10))
-    .filter((n) => !isNaN(n) && n > 0);
-
-  if (ids.length === 0) {
-    console.error('Provide at least one ID with --ids');
-    process.exit(1);
-  }
+  const resolved = await resolveIdeaList(config, opts.ids);
+  const ids = resolved.map((r) => r.id);
 
   const spinner = opts.json ? null : ora(`Moving ${ids.length} ideas to ${status}...`).start();
 
@@ -62,9 +52,9 @@ export async function moveBulkCommand(
 
   for (const r of result.results) {
     if (r.status === 'updated') {
-      console.log(`  ${chalk.green('✓')} #${r.id}`);
+      console.log(`  ${chalk.green('✓')} ${labelFor(resolved, r.id)}`);
     } else {
-      console.log(`  ${chalk.red('✗')} #${r.id}  ${r.error}`);
+      console.log(`  ${chalk.red('✗')} ${labelFor(resolved, r.id)}  ${r.error}`);
     }
   }
   console.log(`${chalk.green(result.updated.toString())} moved to ${status}, ${result.errors > 0 ? chalk.red(result.errors.toString()) : '0'} errors`);

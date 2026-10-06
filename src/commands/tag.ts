@@ -2,19 +2,18 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { getAuthenticatedConfig } from '../config.js';
 import * as api from '../api.js';
+import { resolveIdea, resolveIdeaList, labelFor } from '../ids.js';
+import { splitTags } from '../tags.js';
 
-export async function tagCommand(id: string, tags: string[], opts: { json?: boolean }): Promise<void> {
+export async function tagCommand(id: string, rawTags: string[], opts: { json?: boolean }): Promise<void> {
+  const tags = splitTags(rawTags);
   if (tags.length === 0) {
     console.error('Provide at least one tag');
     process.exit(1);
   }
 
   const config = await getAuthenticatedConfig();
-  const ideaId = parseInt(id, 10);
-  if (isNaN(ideaId)) {
-    console.error('Invalid idea ID');
-    process.exit(1);
-  }
+  const { id: ideaId } = await resolveIdea(config, id);
 
   const spinner = opts.json ? null : ora('Updating tags...').start();
 
@@ -37,15 +36,16 @@ export async function tagAddCommand(
   opts: { ids: string; json?: boolean },
 ): Promise<void> {
   const config = await getAuthenticatedConfig();
-  const ids = parseIds(opts.ids);
-
-  if (ids.length === 0) {
-    console.error('Provide at least one ID with --ids');
+  const resolved = await resolveIdeaList(config, opts.ids);
+  const ids = resolved.map((r) => r.id);
+  const tags = splitTags([tag]);
+  if (tags.length === 0) {
+    console.error('Provide at least one tag');
     process.exit(1);
   }
 
-  const spinner = opts.json ? null : ora(`Adding tag "${tag}" to ${ids.length} ideas...`).start();
-  const result = await api.bulkUpdateIdeas(config, { ids, add_tags: [tag] });
+  const spinner = opts.json ? null : ora(`Adding ${tags.join(", ")} to ${ids.length} ideas...`).start();
+  const result = await api.bulkUpdateIdeas(config, { ids, add_tags: tags });
   spinner?.stop();
 
   if (opts.json) {
@@ -55,12 +55,12 @@ export async function tagAddCommand(
 
   for (const r of result.results) {
     if (r.status === 'updated') {
-      console.log(`  ${chalk.green('✓')} #${r.id}`);
+      console.log(`  ${chalk.green('✓')} ${labelFor(resolved, r.id)}`);
     } else {
-      console.log(`  ${chalk.red('✗')} #${r.id}  ${r.error}`);
+      console.log(`  ${chalk.red('✗')} ${labelFor(resolved, r.id)}  ${r.error}`);
     }
   }
-  console.log(`${chalk.green(result.updated.toString())} tagged with "${tag}", ${result.errors > 0 ? chalk.red(result.errors.toString()) : '0'} errors`);
+  console.log(`${chalk.green(result.updated.toString())} tagged with ${tags.join(", ")}, ${result.errors > 0 ? chalk.red(result.errors.toString()) : '0'} errors`);
 }
 
 export async function tagRemoveCommand(
@@ -68,15 +68,16 @@ export async function tagRemoveCommand(
   opts: { ids: string; json?: boolean },
 ): Promise<void> {
   const config = await getAuthenticatedConfig();
-  const ids = parseIds(opts.ids);
-
-  if (ids.length === 0) {
-    console.error('Provide at least one ID with --ids');
+  const resolved = await resolveIdeaList(config, opts.ids);
+  const ids = resolved.map((r) => r.id);
+  const tags = splitTags([tag]);
+  if (tags.length === 0) {
+    console.error('Provide at least one tag');
     process.exit(1);
   }
 
-  const spinner = opts.json ? null : ora(`Removing tag "${tag}" from ${ids.length} ideas...`).start();
-  const result = await api.bulkUpdateIdeas(config, { ids, remove_tags: [tag] });
+  const spinner = opts.json ? null : ora(`Removing ${tags.join(", ")} from ${ids.length} ideas...`).start();
+  const result = await api.bulkUpdateIdeas(config, { ids, remove_tags: tags });
   spinner?.stop();
 
   if (opts.json) {
@@ -86,17 +87,10 @@ export async function tagRemoveCommand(
 
   for (const r of result.results) {
     if (r.status === 'updated') {
-      console.log(`  ${chalk.green('✓')} #${r.id}`);
+      console.log(`  ${chalk.green('✓')} ${labelFor(resolved, r.id)}`);
     } else {
-      console.log(`  ${chalk.red('✗')} #${r.id}  ${r.error}`);
+      console.log(`  ${chalk.red('✗')} ${labelFor(resolved, r.id)}  ${r.error}`);
     }
   }
-  console.log(`${chalk.green(result.updated.toString())} untagged "${tag}", ${result.errors > 0 ? chalk.red(result.errors.toString()) : '0'} errors`);
-}
-
-function parseIds(idsStr: string): number[] {
-  return idsStr
-    .split(',')
-    .map((s) => parseInt(s.trim(), 10))
-    .filter((n) => !isNaN(n) && n > 0);
+  console.log(`${chalk.green(result.updated.toString())} untagged ${tags.join(", ")}, ${result.errors > 0 ? chalk.red(result.errors.toString()) : '0'} errors`);
 }

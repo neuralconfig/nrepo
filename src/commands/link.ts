@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { getAuthenticatedConfig } from '../config.js';
 import * as api from '../api.js';
+import { resolveIdea, resolveIdeaPair } from '../ids.js';
 import { RELATION_TYPES } from '@neuralrepo/shared';
 import type { RelationType } from '@neuralrepo/shared';
 
@@ -18,13 +19,8 @@ export async function linkCommand(
   }
 
   const config = await getAuthenticatedConfig();
-  const src = parseInt(sourceId, 10);
-  const tgt = parseInt(targetId, 10);
-
-  if (isNaN(src) || isNaN(tgt)) {
-    console.error('Invalid idea IDs');
-    process.exit(1);
-  }
+  const [{ id: src, label: srcLabel }, { id: tgt, label: tgtLabel }] =
+    await resolveIdeaPair(config, sourceId, targetId);
 
   const relationType = opts.type ?? 'related';
   if (!VALID_TYPES.includes(relationType as RelationType)) {
@@ -43,7 +39,7 @@ export async function linkCommand(
       return;
     }
 
-    console.log(chalk.green('✓') + ` Linked #${src} → #${tgt} (${relationType})`);
+    console.log(chalk.green('✓') + ` Linked ${srcLabel} → ${tgtLabel} (${relationType})`);
     if (opts.note) {
       console.log(chalk.dim(`  Note: ${opts.note}`));
     }
@@ -108,9 +104,9 @@ async function linkBatchCommand(
 
   for (const r of result.results) {
     if (r.status === 'created') {
-      console.log(chalk.green('✓') + ` Linked #${r.source_idea_id} → #${r.target_idea_id} (${r.relation_type})`);
+      console.log(chalk.green('✓') + ` Linked id:${r.source_idea_id} → id:${r.target_idea_id} (${r.relation_type})`);
     } else {
-      console.log(chalk.red('✗') + ` #${r.source_idea_id} → #${r.target_idea_id}: ${r.error}`);
+      console.log(chalk.red('✗') + ` id:${r.source_idea_id} → id:${r.target_idea_id}: ${r.error}`);
     }
   }
 
@@ -124,13 +120,8 @@ export async function unlinkCommand(
   opts: { json?: boolean },
 ): Promise<void> {
   const config = await getAuthenticatedConfig();
-  const src = parseInt(sourceId, 10);
-  const tgt = parseInt(targetId, 10);
-
-  if (isNaN(src) || isNaN(tgt)) {
-    console.error('Invalid idea IDs');
-    process.exit(1);
-  }
+  const [{ id: src, label: srcLabel }, { id: tgt, label: tgtLabel }] =
+    await resolveIdeaPair(config, sourceId, targetId);
 
   const spinner = opts.json ? null : ora('Removing link...').start();
 
@@ -144,7 +135,7 @@ export async function unlinkCommand(
     if (opts.json) {
       console.error(JSON.stringify({ error: 'No link found between these ideas' }));
     } else {
-      console.error(`No link found between #${src} and #${tgt}. Run ${chalk.cyan(`nrepo links ${src}`)} to see existing links.`);
+      console.error(`No link found between ${srcLabel} and ${tgtLabel}. Run ${chalk.cyan(`nrepo links ${srcLabel}`)} to see existing links.`);
     }
     process.exit(1);
   }
@@ -157,7 +148,7 @@ export async function unlinkCommand(
     return;
   }
 
-  console.log(chalk.green('✓') + ` Unlinked #${src} ↔ #${tgt}`);
+  console.log(chalk.green('✓') + ` Unlinked ${srcLabel} ↔ ${tgtLabel}`);
 }
 
 export async function linksCommand(
@@ -165,12 +156,7 @@ export async function linksCommand(
   opts: { type?: string; json?: boolean },
 ): Promise<void> {
   const config = await getAuthenticatedConfig();
-  const ideaId = parseInt(id, 10);
-
-  if (isNaN(ideaId)) {
-    console.error('Invalid idea ID');
-    process.exit(1);
-  }
+  const { id: ideaId } = await resolveIdea(config, id);
 
   const spinner = opts.json ? null : ora('Loading links...').start();
   const [idea, relations] = await Promise.all([

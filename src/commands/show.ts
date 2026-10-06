@@ -1,15 +1,12 @@
 import ora from 'ora';
 import { getAuthenticatedConfig } from '../config.js';
 import * as api from '../api.js';
+import { resolveIdea } from '../ids.js';
 import { formatIdeaDetail } from '../format.js';
 
 export async function showCommand(id: string, opts: { json?: boolean }): Promise<void> {
   const config = await getAuthenticatedConfig();
-  const ideaId = parseInt(id, 10);
-  if (isNaN(ideaId)) {
-    console.error('Invalid idea ID');
-    process.exit(1);
-  }
+  const { id: ideaId } = await resolveIdea(config, id);
 
   const spinner = opts.json ? null : ora('Loading idea...').start();
   const idea = await api.getIdea(config, ideaId);

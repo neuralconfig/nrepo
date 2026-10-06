@@ -3,6 +3,7 @@ import ora from 'ora';
 import { getAuthenticatedConfig } from '../config.js';
 import * as api from '../api.js';
 import { formatIdeaRow } from '../format.js';
+import { splitTags } from '../tags.js';
 import type { IdeaStatus, IdeaSource } from '@neuralrepo/shared';
 
 export async function pushCommand(
@@ -15,7 +16,7 @@ export async function pushCommand(
   const idea = await api.createIdea(config, {
     title,
     body: opts.body,
-    tags: opts.tag,
+    tags: splitTags(opts.tag),
     source: 'cli' as IdeaSource,
     status: opts.status as IdeaStatus | undefined,
   });

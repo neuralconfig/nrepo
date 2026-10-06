@@ -2,18 +2,14 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { getAuthenticatedConfig } from '../config.js';
 import * as api from '../api.js';
+import { resolveIdea } from '../ids.js';
 
 export async function rmCommand(
   id: string,
   opts: { json?: boolean; force?: boolean },
 ): Promise<void> {
   const config = await getAuthenticatedConfig();
-  const ideaId = parseInt(id, 10);
-
-  if (isNaN(ideaId)) {
-    console.error('Invalid idea ID');
-    process.exit(1);
-  }
+  const { id: ideaId } = await resolveIdea(config, id);
 
   // Fetch idea for confirmation display
   const spinner = opts.json ? null : ora('Loading idea...').start();

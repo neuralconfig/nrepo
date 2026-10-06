@@ -46,6 +46,13 @@ var AuthError = class extends Error {
   }
 };
 
+// src/version.ts
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join as join2 } from "path";
+var __dirname = dirname(fileURLToPath(import.meta.url));
+var VERSION = JSON.parse(readFileSync(join2(__dirname, "..", "package.json"), "utf8")).version;
+
 // src/api.ts
 var ApiError = class extends Error {
   constructor(message, status, body) {
@@ -55,11 +62,25 @@ var ApiError = class extends Error {
     this.name = "ApiError";
   }
 };
+function apiErrorMessage(body, status) {
+  const error = body?.error;
+  if (typeof error === "string" && error) return error;
+  if (error && typeof error === "object") {
+    const parts = Object.entries(error).map(([field, msgs]) => {
+      const text = Array.isArray(msgs) ? msgs.join(", ") : String(msgs);
+      return field ? `${field}: ${text}` : text;
+    });
+    if (parts.length > 0) return parts.join("; ");
+  }
+  return `HTTP ${status}`;
+}
+var CLIENT_HEADER = { "X-NeuralRepo-Client": `cli/${VERSION}` };
 async function request(config, method, path, body) {
   const url = `${config.api_url}${path}`;
   const headers = {
     "X-API-Key": config.api_key,
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
+    ...CLIENT_HEADER
   };
   let res;
   try {
@@ -76,7 +97,7 @@ async function request(config, method, path, body) {
   if (!res.ok) {
     const json = await res.json().catch(() => ({ error: res.statusText }));
     throw new ApiError(
-      json.error ?? `HTTP ${res.status}`,
+      apiErrorMessage(json, res.status),
       res.status,
       json
     );
@@ -94,6 +115,11 @@ var listIdeas = (c, params) => {
   return request(c, "GET", `/ideas${qs ? `?${qs}` : ""}`);
 };
 var createIdea = (c, data) => request(c, "POST", "/ideas", data);
+var resolveIdeaNumbers = (c, numbers) => request(
+  c,
+  "GET",
+  `/ideas/by-number?numbers=${numbers.join(",")}`
+);
 var getIdea = (c, id) => request(c, "GET", `/ideas/${id}`);
 var updateIdea = (c, id, data) => request(c, "PATCH", `/ideas/${id}`, data);
 var bulkUpdateIdeas = (c, data) => request(c, "PATCH", "/ideas/bulk", data);
@@ -132,12 +158,30 @@ import { randomInt } from "crypto";
 import { createInterface } from "readline/promises";
 import chalk from "chalk";
 import ora from "ora";
+var LOGIN_PROVIDERS = ["choose", "github", "google", "apple", "magic"];
+function parseLoginProvider(value) {
+  const provider = (value ?? "choose").toLowerCase();
+  if (!LOGIN_PROVIDERS.includes(provider)) {
+    throw new Error(`Unknown provider "${value}". Use one of: ${LOGIN_PROVIDERS.join(", ")}`);
+  }
+  return provider;
+}
+function cliAuthUrl(apiUrl, callbackUrl, provider) {
+  return `${apiUrl.replace("/api/v1", "")}/auth/cli?callback=${encodeURIComponent(callbackUrl)}&provider=${provider}`;
+}
 async function loginCommand(opts) {
   if (opts.apiKey) {
     await loginWithApiKey();
-  } else {
-    await loginWithBrowser();
+    return;
   }
+  let provider;
+  try {
+    provider = parseLoginProvider(opts.provider);
+  } catch (err) {
+    console.error(chalk.red(err.message));
+    process.exit(1);
+  }
+  await loginWithBrowser(provider);
 }
 async function loginWithApiKey() {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -159,7 +203,7 @@ async function loginWithApiKey() {
     process.exit(1);
   }
 }
-async function loginWithBrowser() {
+async function loginWithBrowser(provider) {
   const port = randomInt(49152, 65535);
   const callbackUrl = `http://localhost:${port}/callback`;
   console.log(chalk.dim("Starting local auth server..."));
@@ -255,7 +299,7 @@ p{font-size:12px;color:var(--fg-dim);margin:0;font-family:'IBM Plex Mono',monosp
       }
     });
     server.listen(port, () => {
-      const authUrl = `${DEFAULT_API_URL.replace("/api/v1", "")}/auth/cli?callback=${encodeURIComponent(callbackUrl)}`;
+      const authUrl = cliAuthUrl(DEFAULT_API_URL, callbackUrl, provider);
       console.log(`
 Open this URL to log in:
 
@@ -469,7 +513,7 @@ function formatIdeaDetail(idea) {
 }
 function formatDuplicate(dup2) {
   const score = chalk3.yellow(`${(dup2.similarity_score * 100).toFixed(0)}%`);
-  return `  ${chalk3.dim(`#${dup2.idea_number}`)} ${dup2.idea_title} ${chalk3.dim("\u2248")} #${dup2.duplicate_number} ${dup2.duplicate_title} ${score}`;
+  return `  ${chalk3.cyan(String(dup2.id).padStart(4))}  ${chalk3.dim(`#${dup2.idea_number}`)} ${dup2.idea_title} ${chalk3.dim("\u2248")} #${dup2.duplicate_number} ${dup2.duplicate_title} ${score}`;
 }
 function formatDate(iso) {
   const normalized = iso.includes("T") || iso.includes("Z") ? iso : iso.replace(" ", "T") + "Z";
@@ -490,6 +534,19 @@ function formatStatusCounts(ideas) {
   return counts;
 }
 
+// src/tags.ts
+function splitTags(values) {
+  if (!values) return [];
+  const out = [];
+  for (const v of values) {
+    for (const part of v.split(",")) {
+      const tag = part.trim();
+      if (tag && !out.includes(tag)) out.push(tag);
+    }
+  }
+  return out;
+}
+
 // src/commands/push.ts
 async function pushCommand(title, opts) {
   const config = await getAuthenticatedConfig();
@@ -497,7 +554,7 @@ async function pushCommand(title, opts) {
   const idea = await createIdea(config, {
     title,
     body: opts.body,
-    tags: opts.tag,
+    tags: splitTags(opts.tag),
     source: "cli",
     status: opts.status
   });
@@ -646,13 +703,60 @@ async function statusCommand(opts) {
 
 // src/commands/show.ts
 import ora6 from "ora";
+
+// src/ids.ts
+var IdeaRefError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "IdeaRefError";
+  }
+};
+function parseIdeaRef(raw) {
+  const s = raw.trim();
+  const global = /^id:(\d+)$/i.exec(s);
+  if (global) return { kind: "id", value: Number(global[1]) };
+  const num = /^#?(\d+)$/.exec(s);
+  if (num && Number(num[1]) > 0) return { kind: "number", value: Number(num[1]) };
+  throw new IdeaRefError(`"${raw}" is not an idea number. Use 12 or #12 (or id:698 for a global id).`);
+}
+function parseIdeaRefList(raw) {
+  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) throw new IdeaRefError("Provide at least one idea number with --ids");
+  return parts.map(parseIdeaRef);
+}
+async function resolveIdeaRefs(config, refs) {
+  const numbers = [...new Set(refs.filter((r) => r.kind === "number").map((r) => r.value))];
+  const byNumber = /* @__PURE__ */ new Map();
+  for (let i = 0; i < numbers.length; i += 100) {
+    const { results } = await resolveIdeaNumbers(config, numbers.slice(i, i + 100));
+    for (const r of results) byNumber.set(r.number, r.id);
+  }
+  return refs.map((ref) => {
+    if (ref.kind === "id") return { id: ref.value, label: `id:${ref.value}` };
+    const id = byNumber.get(ref.value);
+    if (id == null) throw new IdeaRefError(`Idea #${ref.value} not found.`);
+    return { id, label: `#${ref.value}` };
+  });
+}
+async function resolveIdea(config, raw) {
+  const [resolved] = await resolveIdeaRefs(config, [parseIdeaRef(raw)]);
+  return resolved;
+}
+async function resolveIdeaPair(config, a, b) {
+  const [first, second] = await resolveIdeaRefs(config, [parseIdeaRef(a), parseIdeaRef(b)]);
+  return [first, second];
+}
+async function resolveIdeaList(config, raw) {
+  return resolveIdeaRefs(config, parseIdeaRefList(raw));
+}
+function labelFor(resolved, id) {
+  return resolved.find((r) => r.id === id)?.label ?? `id:${id}`;
+}
+
+// src/commands/show.ts
 async function showCommand(id, opts) {
   const config = await getAuthenticatedConfig();
-  const ideaId = parseInt(id, 10);
-  if (isNaN(ideaId)) {
-    console.error("Invalid idea ID");
-    process.exit(1);
-  }
+  const { id: ideaId } = await resolveIdea(config, id);
   const spinner = opts.json ? null : ora6("Loading idea...").start();
   const idea = await getIdea(config, ideaId);
   spinner?.stop();
@@ -672,11 +776,7 @@ async function moveCommand(id, status, opts) {
     process.exit(1);
   }
   const config = await getAuthenticatedConfig();
-  const ideaId = parseInt(id, 10);
-  if (isNaN(ideaId)) {
-    console.error("Invalid idea ID");
-    process.exit(1);
-  }
+  const { id: ideaId } = await resolveIdea(config, id);
   const spinner = opts.json ? null : ora7("Updating status...").start();
   const idea = await updateIdea(config, ideaId, { status });
   spinner?.stop();
@@ -692,11 +792,8 @@ async function moveBulkCommand(status, opts) {
     process.exit(1);
   }
   const config = await getAuthenticatedConfig();
-  const ids = opts.ids.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n) && n > 0);
-  if (ids.length === 0) {
-    console.error("Provide at least one ID with --ids");
-    process.exit(1);
-  }
+  const resolved = await resolveIdeaList(config, opts.ids);
+  const ids = resolved.map((r) => r.id);
   const spinner = opts.json ? null : ora7(`Moving ${ids.length} ideas to ${status}...`).start();
   const result = await bulkUpdateIdeas(config, { ids, status });
   spinner?.stop();
@@ -706,9 +803,9 @@ async function moveBulkCommand(status, opts) {
   }
   for (const r of result.results) {
     if (r.status === "updated") {
-      console.log(`  ${chalk8.green("\u2713")} #${r.id}`);
+      console.log(`  ${chalk8.green("\u2713")} ${labelFor(resolved, r.id)}`);
     } else {
-      console.log(`  ${chalk8.red("\u2717")} #${r.id}  ${r.error}`);
+      console.log(`  ${chalk8.red("\u2717")} ${labelFor(resolved, r.id)}  ${r.error}`);
     }
   }
   console.log(`${chalk8.green(result.updated.toString())} moved to ${status}, ${result.errors > 0 ? chalk8.red(result.errors.toString()) : "0"} errors`);
@@ -717,17 +814,14 @@ async function moveBulkCommand(status, opts) {
 // src/commands/tag.ts
 import chalk9 from "chalk";
 import ora8 from "ora";
-async function tagCommand(id, tags, opts) {
+async function tagCommand(id, rawTags, opts) {
+  const tags = splitTags(rawTags);
   if (tags.length === 0) {
     console.error("Provide at least one tag");
     process.exit(1);
   }
   const config = await getAuthenticatedConfig();
-  const ideaId = parseInt(id, 10);
-  if (isNaN(ideaId)) {
-    console.error("Invalid idea ID");
-    process.exit(1);
-  }
+  const { id: ideaId } = await resolveIdea(config, id);
   const spinner = opts.json ? null : ora8("Updating tags...").start();
   const existing = await getIdea(config, ideaId);
   const merged = [.../* @__PURE__ */ new Set([...existing.tags, ...tags])];
@@ -741,13 +835,15 @@ async function tagCommand(id, tags, opts) {
 }
 async function tagAddCommand(tag, opts) {
   const config = await getAuthenticatedConfig();
-  const ids = parseIds(opts.ids);
-  if (ids.length === 0) {
-    console.error("Provide at least one ID with --ids");
+  const resolved = await resolveIdeaList(config, opts.ids);
+  const ids = resolved.map((r) => r.id);
+  const tags = splitTags([tag]);
+  if (tags.length === 0) {
+    console.error("Provide at least one tag");
     process.exit(1);
   }
-  const spinner = opts.json ? null : ora8(`Adding tag "${tag}" to ${ids.length} ideas...`).start();
-  const result = await bulkUpdateIdeas(config, { ids, add_tags: [tag] });
+  const spinner = opts.json ? null : ora8(`Adding ${tags.join(", ")} to ${ids.length} ideas...`).start();
+  const result = await bulkUpdateIdeas(config, { ids, add_tags: tags });
   spinner?.stop();
   if (opts.json) {
     console.log(JSON.stringify(result, null, 2));
@@ -755,22 +851,24 @@ async function tagAddCommand(tag, opts) {
   }
   for (const r of result.results) {
     if (r.status === "updated") {
-      console.log(`  ${chalk9.green("\u2713")} #${r.id}`);
+      console.log(`  ${chalk9.green("\u2713")} ${labelFor(resolved, r.id)}`);
     } else {
-      console.log(`  ${chalk9.red("\u2717")} #${r.id}  ${r.error}`);
+      console.log(`  ${chalk9.red("\u2717")} ${labelFor(resolved, r.id)}  ${r.error}`);
     }
   }
-  console.log(`${chalk9.green(result.updated.toString())} tagged with "${tag}", ${result.errors > 0 ? chalk9.red(result.errors.toString()) : "0"} errors`);
+  console.log(`${chalk9.green(result.updated.toString())} tagged with ${tags.join(", ")}, ${result.errors > 0 ? chalk9.red(result.errors.toString()) : "0"} errors`);
 }
 async function tagRemoveCommand(tag, opts) {
   const config = await getAuthenticatedConfig();
-  const ids = parseIds(opts.ids);
-  if (ids.length === 0) {
-    console.error("Provide at least one ID with --ids");
+  const resolved = await resolveIdeaList(config, opts.ids);
+  const ids = resolved.map((r) => r.id);
+  const tags = splitTags([tag]);
+  if (tags.length === 0) {
+    console.error("Provide at least one tag");
     process.exit(1);
   }
-  const spinner = opts.json ? null : ora8(`Removing tag "${tag}" from ${ids.length} ideas...`).start();
-  const result = await bulkUpdateIdeas(config, { ids, remove_tags: [tag] });
+  const spinner = opts.json ? null : ora8(`Removing ${tags.join(", ")} from ${ids.length} ideas...`).start();
+  const result = await bulkUpdateIdeas(config, { ids, remove_tags: tags });
   spinner?.stop();
   if (opts.json) {
     console.log(JSON.stringify(result, null, 2));
@@ -778,29 +876,22 @@ async function tagRemoveCommand(tag, opts) {
   }
   for (const r of result.results) {
     if (r.status === "updated") {
-      console.log(`  ${chalk9.green("\u2713")} #${r.id}`);
+      console.log(`  ${chalk9.green("\u2713")} ${labelFor(resolved, r.id)}`);
     } else {
-      console.log(`  ${chalk9.red("\u2717")} #${r.id}  ${r.error}`);
+      console.log(`  ${chalk9.red("\u2717")} ${labelFor(resolved, r.id)}  ${r.error}`);
     }
   }
-  console.log(`${chalk9.green(result.updated.toString())} untagged "${tag}", ${result.errors > 0 ? chalk9.red(result.errors.toString()) : "0"} errors`);
-}
-function parseIds(idsStr) {
-  return idsStr.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n) && n > 0);
+  console.log(`${chalk9.green(result.updated.toString())} untagged ${tags.join(", ")}, ${result.errors > 0 ? chalk9.red(result.errors.toString()) : "0"} errors`);
 }
 
 // src/commands/pull.ts
 import { writeFile as writeFile2, mkdir as mkdir2 } from "fs/promises";
-import { join as join2, resolve } from "path";
+import { join as join3, resolve } from "path";
 import chalk10 from "chalk";
 import ora9 from "ora";
 async function pullCommand(id, opts) {
   const config = await getAuthenticatedConfig();
-  const ideaId = parseInt(id, 10);
-  if (isNaN(ideaId)) {
-    console.error("Invalid idea ID");
-    process.exit(1);
-  }
+  const { id: ideaId } = await resolveIdea(config, id);
   const spinner = opts.json ? null : ora9("Pulling idea context...").start();
   const idea = await getIdea(config, ideaId);
   spinner?.stop();
@@ -823,7 +914,7 @@ async function pullCommand(id, opts) {
     "",
     idea.body ?? "_No body_"
   ].filter(Boolean).join("\n");
-  await writeFile2(join2(dir, "IDEA.md"), ideaMd + "\n", "utf-8");
+  await writeFile2(join3(dir, "IDEA.md"), ideaMd + "\n", "utf-8");
   const relations = idea.relations ?? [];
   if (relations.length > 0) {
     const contextLines = [
@@ -835,7 +926,7 @@ async function pullCommand(id, opts) {
         return `- **${r.relation_type}**: ${title}${score}`;
       })
     ];
-    await writeFile2(join2(dir, "CONTEXT.md"), contextLines.join("\n") + "\n", "utf-8");
+    await writeFile2(join3(dir, "CONTEXT.md"), contextLines.join("\n") + "\n", "utf-8");
   }
   const links = idea.links ?? [];
   if (links.length > 0) {
@@ -844,14 +935,14 @@ async function pullCommand(id, opts) {
       "",
       ...links.map((l) => `- [${l.title ?? l.link_type}](${l.url})`)
     ];
-    await writeFile2(join2(dir, "RELATED.md"), linkLines.join("\n") + "\n", "utf-8");
+    await writeFile2(join3(dir, "RELATED.md"), linkLines.join("\n") + "\n", "utf-8");
   }
   const syncConfig = {
     idea_id: idea.id,
     api_url: config.api_url,
     pulled_at: (/* @__PURE__ */ new Date()).toISOString()
   };
-  await writeFile2(join2(dir, ".neuralrepo"), JSON.stringify(syncConfig, null, 2) + "\n", "utf-8");
+  await writeFile2(join3(dir, ".neuralrepo"), JSON.stringify(syncConfig, null, 2) + "\n", "utf-8");
   console.log(chalk10.green("\u2713") + ` Pulled #${idea.number} to ${dir}/`);
   console.log(chalk10.dim(`  IDEA.md${relations.length ? ", CONTEXT.md" : ""}${links.length ? ", RELATED.md" : ""}, .neuralrepo`));
 }
@@ -861,19 +952,11 @@ import chalk11 from "chalk";
 import ora10 from "ora";
 async function diffCommand(id1, id2OrOpts, opts) {
   const config = await getAuthenticatedConfig();
-  const firstId = parseInt(id1, 10);
-  if (isNaN(firstId)) {
-    console.error("Invalid idea ID");
-    process.exit(1);
-  }
+  const { id: firstId, label: firstIdLabel } = await resolveIdea(config, id1);
   let secondId;
   let resolvedOpts;
   if (typeof id2OrOpts === "string") {
-    secondId = parseInt(id2OrOpts, 10);
-    if (isNaN(secondId)) {
-      console.error("Invalid second idea ID");
-      process.exit(1);
-    }
+    secondId = (await resolveIdea(config, id2OrOpts)).id;
     resolvedOpts = opts ?? {};
   } else if (id2OrOpts && typeof id2OrOpts === "object") {
     resolvedOpts = id2OrOpts;
@@ -888,11 +971,11 @@ async function diffCommand(id1, id2OrOpts, opts) {
     if (secondId == null) {
       spinner?.stop();
       if (jsonOutput) {
-        console.error(JSON.stringify({ error: `No parent or related idea to diff against. Usage: nrepo diff ${firstId} <other-id>`, code: "no_diff_target" }));
+        console.error(JSON.stringify({ error: `No parent or related idea to diff against. Usage: nrepo diff ${firstIdLabel} <other-number>`, code: "no_diff_target" }));
         process.exit(1);
       }
       console.log(chalk11.dim("No parent or related idea to diff against."));
-      console.log(chalk11.dim(`Usage: nrepo diff ${firstId} <other-id>`));
+      console.log(chalk11.dim(`Usage: nrepo diff ${firstIdLabel} <other-number>`));
       return;
     }
   }
@@ -971,11 +1054,7 @@ import chalk12 from "chalk";
 import ora11 from "ora";
 async function branchCommand(id, opts) {
   const config = await getAuthenticatedConfig();
-  const sourceId = parseInt(id, 10);
-  if (isNaN(sourceId)) {
-    console.error("Invalid idea ID");
-    process.exit(1);
-  }
+  const { id: sourceId, label: sourceIdLabel } = await resolveIdea(config, id);
   const spinner = opts.json ? null : ora11("Branching idea...").start();
   const source = await getIdea(config, sourceId);
   const forked = await createIdea(config, {
@@ -991,13 +1070,13 @@ async function branchCommand(id, opts) {
     console.log(JSON.stringify(forked, null, 2));
     return;
   }
-  console.log(chalk12.green("\u2713") + ` Branched from #${sourceId} as #${forked.number}`);
+  console.log(chalk12.green("\u2713") + ` Branched from ${sourceIdLabel} as #${forked.number}`);
   console.log(formatIdeaRow(forked));
   if (forked.processing) {
     console.log(chalk12.dim("\n  Processing: embeddings, dedup, and auto-tagging queued"));
   }
   console.log(chalk12.dim(`
-  Compare with: nrepo diff ${sourceId} ${forked.id}`));
+  Compare with: nrepo diff ${sourceIdLabel} #${forked.number}`));
 }
 
 // src/commands/edit.ts
@@ -1005,11 +1084,7 @@ import chalk13 from "chalk";
 import ora12 from "ora";
 async function editCommand(id, opts) {
   const config = await getAuthenticatedConfig();
-  const ideaId = parseInt(id, 10);
-  if (isNaN(ideaId)) {
-    console.error("Invalid idea ID");
-    process.exit(1);
-  }
+  const { id: ideaId } = await resolveIdea(config, id);
   const updates = {};
   if (opts.title) updates.title = opts.title;
   if (opts.body) updates.body = opts.body;
@@ -1086,11 +1161,7 @@ import chalk15 from "chalk";
 import ora14 from "ora";
 async function rmCommand(id, opts) {
   const config = await getAuthenticatedConfig();
-  const ideaId = parseInt(id, 10);
-  if (isNaN(ideaId)) {
-    console.error("Invalid idea ID");
-    process.exit(1);
-  }
+  const { id: ideaId } = await resolveIdea(config, id);
   const spinner = opts.json ? null : ora14("Loading idea...").start();
   const idea = await getIdea(config, ideaId);
   spinner?.stop();
@@ -1134,7 +1205,7 @@ async function duplicateListCommand(opts) {
     console.log(formatDuplicate(dup2));
   }
   console.log("");
-  console.log(chalk16.dim("  Use `nrepo duplicate dismiss <id>` or `nrepo duplicate merge <id>` to resolve."));
+  console.log(chalk16.dim("  Use `nrepo duplicate dismiss <id>` or `nrepo duplicate merge <id>` with the id in the first column."));
 }
 async function duplicateDismissCommand(id, opts) {
   const config = await getAuthenticatedConfig();
@@ -1178,12 +1249,7 @@ async function linkCommand(sourceId, targetId, opts) {
     return linkBatchCommand(opts);
   }
   const config = await getAuthenticatedConfig();
-  const src = parseInt(sourceId, 10);
-  const tgt = parseInt(targetId, 10);
-  if (isNaN(src) || isNaN(tgt)) {
-    console.error("Invalid idea IDs");
-    process.exit(1);
-  }
+  const [{ id: src, label: srcLabel }, { id: tgt, label: tgtLabel }] = await resolveIdeaPair(config, sourceId, targetId);
   const relationType = opts.type ?? "related";
   if (!VALID_TYPES.includes(relationType)) {
     console.error(`Invalid type "${relationType}". Must be one of: ${VALID_TYPES.join(", ")}`);
@@ -1197,7 +1263,7 @@ async function linkCommand(sourceId, targetId, opts) {
       console.log(JSON.stringify(result.relation, null, 2));
       return;
     }
-    console.log(chalk17.green("\u2713") + ` Linked #${src} \u2192 #${tgt} (${relationType})`);
+    console.log(chalk17.green("\u2713") + ` Linked ${srcLabel} \u2192 ${tgtLabel} (${relationType})`);
     if (opts.note) {
       console.log(chalk17.dim(`  Note: ${opts.note}`));
     }
@@ -1250,9 +1316,9 @@ async function linkBatchCommand(opts) {
   }
   for (const r of result.results) {
     if (r.status === "created") {
-      console.log(chalk17.green("\u2713") + ` Linked #${r.source_idea_id} \u2192 #${r.target_idea_id} (${r.relation_type})`);
+      console.log(chalk17.green("\u2713") + ` Linked id:${r.source_idea_id} \u2192 id:${r.target_idea_id} (${r.relation_type})`);
     } else {
-      console.log(chalk17.red("\u2717") + ` #${r.source_idea_id} \u2192 #${r.target_idea_id}: ${r.error}`);
+      console.log(chalk17.red("\u2717") + ` id:${r.source_idea_id} \u2192 id:${r.target_idea_id}: ${r.error}`);
     }
   }
   console.log("");
@@ -1260,12 +1326,7 @@ async function linkBatchCommand(opts) {
 }
 async function unlinkCommand(sourceId, targetId, opts) {
   const config = await getAuthenticatedConfig();
-  const src = parseInt(sourceId, 10);
-  const tgt = parseInt(targetId, 10);
-  if (isNaN(src) || isNaN(tgt)) {
-    console.error("Invalid idea IDs");
-    process.exit(1);
-  }
+  const [{ id: src, label: srcLabel }, { id: tgt, label: tgtLabel }] = await resolveIdeaPair(config, sourceId, targetId);
   const spinner = opts.json ? null : ora16("Removing link...").start();
   const relations = await getIdeaRelations(config, src);
   const match = relations.outgoing.find((r) => r.idea_id === tgt) ?? relations.incoming.find((r) => r.idea_id === tgt);
@@ -1274,7 +1335,7 @@ async function unlinkCommand(sourceId, targetId, opts) {
     if (opts.json) {
       console.error(JSON.stringify({ error: "No link found between these ideas" }));
     } else {
-      console.error(`No link found between #${src} and #${tgt}. Run ${chalk17.cyan(`nrepo links ${src}`)} to see existing links.`);
+      console.error(`No link found between ${srcLabel} and ${tgtLabel}. Run ${chalk17.cyan(`nrepo links ${srcLabel}`)} to see existing links.`);
     }
     process.exit(1);
   }
@@ -1284,15 +1345,11 @@ async function unlinkCommand(sourceId, targetId, opts) {
     console.log(JSON.stringify({ success: true }));
     return;
   }
-  console.log(chalk17.green("\u2713") + ` Unlinked #${src} \u2194 #${tgt}`);
+  console.log(chalk17.green("\u2713") + ` Unlinked ${srcLabel} \u2194 ${tgtLabel}`);
 }
 async function linksCommand(id, opts) {
   const config = await getAuthenticatedConfig();
-  const ideaId = parseInt(id, 10);
-  if (isNaN(ideaId)) {
-    console.error("Invalid idea ID");
-    process.exit(1);
-  }
+  const { id: ideaId } = await resolveIdea(config, id);
   const spinner = opts.json ? null : ora16("Loading links...").start();
   const [idea, relations] = await Promise.all([
     getIdea(config, ideaId),
@@ -1362,12 +1419,7 @@ import chalk18 from "chalk";
 import ora17 from "ora";
 async function mergeCommand(keepId, absorbId, opts) {
   const config = await getAuthenticatedConfig();
-  const keep = parseInt(keepId, 10);
-  const absorb = parseInt(absorbId, 10);
-  if (isNaN(keep) || isNaN(absorb)) {
-    console.error("Invalid idea IDs");
-    process.exit(1);
-  }
+  const [{ id: keep }, { id: absorb }] = await resolveIdeaPair(config, keepId, absorbId);
   if (keep === absorb) {
     console.error("Cannot merge an idea with itself");
     process.exit(1);
@@ -1405,11 +1457,7 @@ import chalk19 from "chalk";
 import ora18 from "ora";
 async function graphCommand(id, opts) {
   const config = await getAuthenticatedConfig();
-  const startId = parseInt(id, 10);
-  if (isNaN(startId)) {
-    console.error("Invalid idea ID");
-    process.exit(1);
-  }
+  const { id: startId } = await resolveIdea(config, id);
   const maxDepth = Math.min(parseInt(opts.depth ?? "1", 10), 5);
   const typeFilter = opts.type?.split(",");
   const spinner = opts.json ? null : ora18("Traversing graph...").start();
@@ -1524,13 +1572,13 @@ async function graphCommand(id, opts) {
 }
 
 // src/update-check.ts
-import { readFileSync, existsSync as existsSync2 } from "fs";
+import { readFileSync as readFileSync2, existsSync as existsSync2 } from "fs";
 import { writeFile as writeFile3, mkdir as mkdir3, copyFile } from "fs/promises";
 import { homedir as homedir2 } from "os";
-import { join as join3, dirname } from "path";
-import { fileURLToPath } from "url";
+import { join as join4, dirname as dirname2 } from "path";
+import { fileURLToPath as fileURLToPath2 } from "url";
 import chalk20 from "chalk";
-var CHECK_FILE = join3(CONFIG_DIR, "update-check.json");
+var CHECK_FILE = join4(CONFIG_DIR, "update-check.json");
 var WEEK_MS = 7 * 24 * 60 * 60 * 1e3;
 var PACKAGE_NAME = "@neuralconfig/nrepo";
 function checkForUpdates(currentVersion) {
@@ -1555,7 +1603,7 @@ function printUpdateNotice(current, latest) {
 function readCachedCheck() {
   if (!existsSync2(CHECK_FILE)) return null;
   try {
-    const raw = readFileSync(CHECK_FILE, "utf-8");
+    const raw = readFileSync2(CHECK_FILE, "utf-8");
     return JSON.parse(raw);
   } catch {
     return null;
@@ -1603,31 +1651,29 @@ function fetchAndCache(currentVersion) {
 }
 async function updateSkillFile() {
   try {
-    const claudeDir = join3(homedir2(), ".claude");
+    const claudeDir = join4(homedir2(), ".claude");
     if (!existsSync2(claudeDir)) return;
-    const skillDir = join3(claudeDir, "skills", "neuralrepo");
+    const skillDir = join4(claudeDir, "skills", "neuralrepo");
     if (!existsSync2(skillDir)) {
       await mkdir3(skillDir, { recursive: true });
     }
-    const src = join3(dirname(fileURLToPath(import.meta.url)), "..", "skill", "SKILL.md");
+    const src = join4(dirname2(fileURLToPath2(import.meta.url)), "..", "skill", "SKILL.md");
     if (!existsSync2(src)) return;
-    const dest = join3(skillDir, "SKILL.md");
+    const dest = join4(skillDir, "SKILL.md");
     await copyFile(src, dest);
   } catch {
   }
 }
 
 // src/index.ts
-import { readFileSync as readFileSync2 } from "fs";
-import { fileURLToPath as fileURLToPath2 } from "url";
-import { dirname as dirname2, join as join4 } from "path";
+import { fileURLToPath as fileURLToPath3 } from "url";
+import { dirname as dirname3, join as join5 } from "path";
 import { existsSync as existsSync3 } from "fs";
 import { homedir as homedir3 } from "os";
-var __dirname = dirname2(fileURLToPath2(import.meta.url));
-var VERSION = JSON.parse(readFileSync2(join4(__dirname, "..", "package.json"), "utf8")).version;
+var __dirname2 = dirname3(fileURLToPath3(import.meta.url));
 var program = new Command();
-program.name("nrepo").description("NeuralRepo \u2014 capture and manage ideas from the terminal").version(VERSION);
-program.command("login").description("Authenticate with NeuralRepo").option("--api-key", "Login with an API key instead of browser OAuth").action(wrap(loginCommand));
+program.name("nrepo").description("NeuralRepo \u2014 capture and manage ideas from the terminal").version(VERSION).addHelpText("after", "\nIdeas are named by their number: 12 or #12. Use id:698 for a global id from --json output.");
+program.command("login").description("Authenticate with NeuralRepo").option("--api-key", "Login with an API key instead of browser OAuth").option("--provider <provider>", "Browser sign-in method: choose|github|google|apple|magic (default: choose)").action(wrap(loginCommand));
 program.command("logout").description("Clear stored credentials").action(wrap(async () => {
   await clearConfig();
   console.log("Logged out.");
@@ -1635,17 +1681,17 @@ program.command("logout").description("Clear stored credentials").action(wrap(as
 program.command("install-skill").description("Install the Claude Code skill for NeuralRepo").action(async () => {
   const { existsSync: existsSync4, mkdirSync, copyFileSync } = await import("fs");
   const { homedir: homedir4 } = await import("os");
-  const claudeDir = join4(homedir4(), ".claude");
+  const claudeDir = join5(homedir4(), ".claude");
   if (!existsSync4(claudeDir)) {
     console.log(chalk21.yellow("Claude Code does not appear to be installed (~/.claude not found)."));
     console.log("Install Claude Code first, then re-run this command.");
     process.exitCode = 1;
     return;
   }
-  const skillDir = join4(claudeDir, "skills", "neuralrepo");
+  const skillDir = join5(claudeDir, "skills", "neuralrepo");
   mkdirSync(skillDir, { recursive: true });
-  const src = join4(__dirname, "..", "skill", "SKILL.md");
-  const dest = join4(skillDir, "SKILL.md");
+  const src = join5(__dirname2, "..", "skill", "SKILL.md");
+  const dest = join5(skillDir, "SKILL.md");
   copyFileSync(src, dest);
   console.log(chalk21.green("Claude Code skill installed."));
   console.log(`  ${dest}`);
@@ -1657,7 +1703,7 @@ program.command("log").description("List recent ideas").option("--limit <n>", "M
 program.command("status").description("Overview dashboard").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(statusCommand));
 program.command("show <id>").description("Show full idea detail").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(showCommand));
 program.command("edit <id>").description("Update an idea's title or body").option("--title <title>", "New title").option("--body <body>", "New body").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(editCommand));
-program.command("move <id-or-status> [status]").description("Change idea status (single: move <id> <status>, bulk: move <status> --ids 1,2,3)").option("--ids <ids>", "Comma-separated idea IDs for bulk move").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(async (idOrStatus, status, opts) => {
+program.command("move <id-or-status> [status]").description("Change idea status (single: move <id> <status>, bulk: move <status> --ids 1,2,3)").option("--ids <ids>", "Comma-separated idea numbers for bulk move").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(async (idOrStatus, status, opts) => {
   if (opts.ids) {
     await moveBulkCommand(idOrStatus, { ids: opts.ids, json: opts.json });
   } else if (status) {
@@ -1668,8 +1714,8 @@ program.command("move <id-or-status> [status]").description("Change idea status 
   }
 }));
 var tagCmd = program.command("tag").description("Manage tags (tag <id> <tags...> or tag add/remove <tag> --ids 1,2,3)");
-tagCmd.command("add <tag>").description("Add tag to multiple ideas").requiredOption("--ids <ids>", "Comma-separated idea IDs").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(tagAddCommand));
-tagCmd.command("remove <tag>").description("Remove tag from multiple ideas").requiredOption("--ids <ids>", "Comma-separated idea IDs").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(tagRemoveCommand));
+tagCmd.command("add <tag>").description("Add tag to multiple ideas").requiredOption("--ids <ids>", "Comma-separated idea numbers").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(tagAddCommand));
+tagCmd.command("remove <tag>").description("Remove tag from multiple ideas").requiredOption("--ids <ids>", "Comma-separated idea numbers").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(tagRemoveCommand));
 tagCmd.argument("[id]").argument("[tags...]").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(async (id, tags, opts) => {
   if (id && tags && tags.length > 0) {
     await tagCommand(id, tags, { json: opts?.json });
@@ -1694,7 +1740,7 @@ keys.command("create <label>").description("Create a new API key").option("--jso
 keys.command("revoke <key-id>").description("Revoke an API key").option("--json", "Output as JSON").option("--human", "Force human-readable output").action(wrap(keysRevokeCommand));
 program.addHelpText("after", `
 Help and support: https://support.neuralconfig.com/neuralrepo?from=app&platform=cli&v=${VERSION}`);
-var configExists = existsSync3(join4(homedir3(), ".config", "neuralrepo", "config.json"));
+var configExists = existsSync3(join5(homedir3(), ".config", "neuralrepo", "config.json"));
 if (!configExists) {
   program.addHelpText("afterAll", () => {
     const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
@@ -1744,7 +1790,7 @@ function wrap(fn) {
         console.error(JSON.stringify(error));
         process.exit(1);
       }
-      if (err instanceof AuthError) {
+      if (err instanceof AuthError || err instanceof IdeaRefError) {
         console.error(chalk21.red(err.message));
         process.exit(1);
       }
@@ -1769,6 +1815,9 @@ function wrap(fn) {
 function errorToJson(err) {
   if (err instanceof AuthError) {
     return { error: err.message, code: "auth_required" };
+  }
+  if (err instanceof IdeaRefError) {
+    return { error: err.message, code: "invalid_idea" };
   }
   if (err instanceof ApiError) {
     return { error: err.message, code: `http_${err.status}`, status: err.status };

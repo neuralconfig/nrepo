@@ -23,25 +23,27 @@ import { mergeCommand } from './commands/merge.js';
 import { graphCommand } from './commands/graph.js';
 import { clearConfig } from './config.js';
 import { checkForUpdates } from './update-check.js';
-import { readFileSync } from 'fs';
+import { IdeaRefError } from './ids.js';
+import { VERSION } from './version.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const VERSION = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')).version as string;
 
 const program = new Command();
 
 program
   .name('nrepo')
   .description('NeuralRepo — capture and manage ideas from the terminal')
-  .version(VERSION);
+  .version(VERSION)
+  .addHelpText('after', '\nIdeas are named by their number: 12 or #12. Use id:698 for a global id from --json output.');
 
 // login
 program
   .command('login')
   .description('Authenticate with NeuralRepo')
   .option('--api-key', 'Login with an API key instead of browser OAuth')
+  .option('--provider <provider>', 'Browser sign-in method: choose|github|google|apple|magic (default: choose)')
   .action(wrap(loginCommand));
 
 // logout
@@ -145,7 +147,7 @@ program
 program
   .command('move <id-or-status> [status]')
   .description('Change idea status (single: move <id> <status>, bulk: move <status> --ids 1,2,3)')
-  .option('--ids <ids>', 'Comma-separated idea IDs for bulk move')
+  .option('--ids <ids>', 'Comma-separated idea numbers for bulk move')
   .option('--json', 'Output as JSON')
   .option('--human', 'Force human-readable output')
   .action(wrap(async (idOrStatus: string, status: string | undefined, opts: { ids?: string; json?: boolean }) => {
@@ -169,7 +171,7 @@ const tagCmd = program
 tagCmd
   .command('add <tag>')
   .description('Add tag to multiple ideas')
-  .requiredOption('--ids <ids>', 'Comma-separated idea IDs')
+  .requiredOption('--ids <ids>', 'Comma-separated idea numbers')
   .option('--json', 'Output as JSON')
   .option('--human', 'Force human-readable output')
   .action(wrap(tagAddCommand));
@@ -177,7 +179,7 @@ tagCmd
 tagCmd
   .command('remove <tag>')
   .description('Remove tag from multiple ideas')
-  .requiredOption('--ids <ids>', 'Comma-separated idea IDs')
+  .requiredOption('--ids <ids>', 'Comma-separated idea numbers')
   .option('--json', 'Output as JSON')
   .option('--human', 'Force human-readable output')
   .action(wrap(tagRemoveCommand));
@@ -399,7 +401,7 @@ function wrap<T extends (...args: never[]) => Promise<void>>(fn: T): T {
         console.error(JSON.stringify(error));
         process.exit(1);
       }
-      if (err instanceof AuthError) {
+      if (err instanceof AuthError || err instanceof IdeaRefError) {
         console.error(chalk.red(err.message));
         process.exit(1);
       }
@@ -425,6 +427,9 @@ function wrap<T extends (...args: never[]) => Promise<void>>(fn: T): T {
 function errorToJson(err: unknown): { error: string; code: string; status?: number } {
   if (err instanceof AuthError) {
     return { error: err.message, code: 'auth_required' };
+  }
+  if (err instanceof IdeaRefError) {
+    return { error: err.message, code: 'invalid_idea' };
   }
   if (err instanceof ApiError) {
     return { error: err.message, code: `http_${err.status}`, status: err.status };

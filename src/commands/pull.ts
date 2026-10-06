@@ -4,14 +4,11 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { getAuthenticatedConfig } from '../config.js';
 import * as api from '../api.js';
+import { resolveIdea } from '../ids.js';
 
 export async function pullCommand(id: string, opts: { to?: string; json?: boolean }): Promise<void> {
   const config = await getAuthenticatedConfig();
-  const ideaId = parseInt(id, 10);
-  if (isNaN(ideaId)) {
-    console.error('Invalid idea ID');
-    process.exit(1);
-  }
+  const { id: ideaId } = await resolveIdea(config, id);
 
   const spinner = opts.json ? null : ora('Pulling idea context...').start();
   const idea = await api.getIdea(config, ideaId);

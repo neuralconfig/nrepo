@@ -2,18 +2,14 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { getAuthenticatedConfig } from '../config.js';
 import * as api from '../api.js';
+import { resolveIdea } from '../ids.js';
 
 export async function editCommand(
   id: string,
   opts: { title?: string; body?: string; json?: boolean; human?: boolean },
 ): Promise<void> {
   const config = await getAuthenticatedConfig();
-  const ideaId = parseInt(id, 10);
-
-  if (isNaN(ideaId)) {
-    console.error('Invalid idea ID');
-    process.exit(1);
-  }
+  const { id: ideaId } = await resolveIdea(config, id);
 
   const updates: Record<string, string> = {};
   if (opts.title) updates.title = opts.title;

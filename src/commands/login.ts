@@ -6,12 +6,35 @@ import ora from 'ora';
 import { saveConfig, DEFAULT_API_URL } from '../config.js';
 import * as api from '../api.js';
 
-export async function loginCommand(opts: { apiKey?: boolean }): Promise<void> {
+/** Sign-in methods `/auth/cli` accepts; `choose` shows a picker. */
+export const LOGIN_PROVIDERS = ['choose', 'github', 'google', 'apple', 'magic'] as const;
+export type LoginProvider = (typeof LOGIN_PROVIDERS)[number];
+
+export function parseLoginProvider(value: string | undefined): LoginProvider {
+  const provider = (value ?? 'choose').toLowerCase();
+  if (!(LOGIN_PROVIDERS as readonly string[]).includes(provider)) {
+    throw new Error(`Unknown provider "${value}". Use one of: ${LOGIN_PROVIDERS.join(', ')}`);
+  }
+  return provider as LoginProvider;
+}
+
+export function cliAuthUrl(apiUrl: string, callbackUrl: string, provider: LoginProvider): string {
+  return `${apiUrl.replace('/api/v1', '')}/auth/cli?callback=${encodeURIComponent(callbackUrl)}&provider=${provider}`;
+}
+
+export async function loginCommand(opts: { apiKey?: boolean; provider?: string }): Promise<void> {
   if (opts.apiKey) {
     await loginWithApiKey();
-  } else {
-    await loginWithBrowser();
+    return;
   }
+  let provider: LoginProvider;
+  try {
+    provider = parseLoginProvider(opts.provider);
+  } catch (err) {
+    console.error(chalk.red((err as Error).message));
+    process.exit(1);
+  }
+  await loginWithBrowser(provider);
 }
 
 async function loginWithApiKey(): Promise<void> {
@@ -38,7 +61,7 @@ async function loginWithApiKey(): Promise<void> {
   }
 }
 
-async function loginWithBrowser(): Promise<void> {
+async function loginWithBrowser(provider: LoginProvider): Promise<void> {
   const port = randomInt(49152, 65535);
   const callbackUrl = `http://localhost:${port}/callback`;
 
@@ -140,7 +163,7 @@ p{font-size:12px;color:var(--fg-dim);margin:0;font-family:'IBM Plex Mono',monosp
     });
 
     server.listen(port, () => {
-      const authUrl = `${DEFAULT_API_URL.replace('/api/v1', '')}/auth/cli?callback=${encodeURIComponent(callbackUrl)}`;
+      const authUrl = cliAuthUrl(DEFAULT_API_URL, callbackUrl, provider);
       console.log(`\nOpen this URL to log in:\n\n  ${chalk.underline(authUrl)}\n`);
       console.log(chalk.dim('Waiting for authentication...'));
 

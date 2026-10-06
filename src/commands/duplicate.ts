@@ -28,7 +28,7 @@ export async function duplicateListCommand(opts: { json?: boolean }): Promise<vo
     console.log(formatDuplicate(dup));
   }
   console.log('');
-  console.log(chalk.dim('  Use `nrepo duplicate dismiss <id>` or `nrepo duplicate merge <id>` to resolve.'));
+  console.log(chalk.dim('  Use `nrepo duplicate dismiss <id>` or `nrepo duplicate merge <id>` with the id in the first column.'));
 }
 
 export async function duplicateDismissCommand(

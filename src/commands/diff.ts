@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { getAuthenticatedConfig } from '../config.js';
 import * as api from '../api.js';
+import { resolveIdea } from '../ids.js';
 import type { ApiIdea, ApiIdeaRelation } from '@neuralrepo/shared';
 
 export async function diffCommand(
@@ -11,11 +12,7 @@ export async function diffCommand(
 ): Promise<void> {
   const config = await getAuthenticatedConfig();
 
-  const firstId = parseInt(id1, 10);
-  if (isNaN(firstId)) {
-    console.error('Invalid idea ID');
-    process.exit(1);
-  }
+  const { id: firstId, label: firstIdLabel } = await resolveIdea(config, id1);
 
   // Commander passes (id1, id2, opts, Command) or (id1, undefined, opts, Command)
   // when [id2] is optional. Resolve accordingly.
@@ -23,11 +20,7 @@ export async function diffCommand(
   let resolvedOpts: { json?: boolean; human?: boolean };
 
   if (typeof id2OrOpts === 'string') {
-    secondId = parseInt(id2OrOpts, 10);
-    if (isNaN(secondId)) {
-      console.error('Invalid second idea ID');
-      process.exit(1);
-    }
+    secondId = (await resolveIdea(config, id2OrOpts)).id;
     resolvedOpts = opts ?? {};
   } else if (id2OrOpts && typeof id2OrOpts === 'object') {
     resolvedOpts = id2OrOpts;
@@ -47,11 +40,11 @@ export async function diffCommand(
     if (secondId == null) {
       spinner?.stop();
       if (jsonOutput) {
-        console.error(JSON.stringify({ error: `No parent or related idea to diff against. Usage: nrepo diff ${firstId} <other-id>`, code: 'no_diff_target' }));
+        console.error(JSON.stringify({ error: `No parent or related idea to diff against. Usage: nrepo diff ${firstIdLabel} <other-number>`, code: 'no_diff_target' }));
         process.exit(1);
       }
       console.log(chalk.dim('No parent or related idea to diff against.'));
-      console.log(chalk.dim(`Usage: nrepo diff ${firstId} <other-id>`));
+      console.log(chalk.dim(`Usage: nrepo diff ${firstIdLabel} <other-number>`));
       return;
     }
   }

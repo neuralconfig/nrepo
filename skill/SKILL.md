@@ -145,12 +145,16 @@ Then read IDEA.md and CONTEXT.md for full project context.
 nrepo status   # Idea counts by status, recent captures, pending duplicates
 ```
 
+## Idea numbers
+
+Ideas are named by their per-user number, the `#12` the CLI and web app show: `nrepo show 12` and `nrepo show '#12'` are the same idea. In `--json` output that is the `number` field. The `id` field is a global id; pass it as `id:698` if you have one. Tags can be repeated or comma-separated: `--tag a,b` saves two tags.
+
 ## JSON output
 
 All commands support `--json` for machine-readable output. Combine with unix tools:
 
 ```bash
-nrepo search "auth" --json | jq '.results[0].id'
+nrepo search "auth" --json | jq '.results[0].number'
 nrepo show 42 --json
 nrepo log --status captured --json
 nrepo links 42 --json
@@ -162,7 +166,7 @@ nrepo graph 42 --depth 2 --json
 ### Bulk tagging from search
 ```bash
 nrepo search "authentication" --json
-# Review results, identify relevant IDs
+# Review results, note the idea numbers
 nrepo tag add "auth-v2" --ids 42,57,63
 ```
 
@@ -175,9 +179,9 @@ nrepo move shipped --ids 91
 
 ### Managing duplicates
 ```bash
-nrepo duplicate                  # List pending duplicate detections
-nrepo duplicate dismiss 7        # Dismiss a false positive
-nrepo duplicate merge 7          # Merge duplicate into primary
+nrepo duplicate list             # List pending detections (detection id first)
+nrepo duplicate dismiss 7        # Dismiss a false positive (detection id)
+nrepo duplicate merge 7          # Merge duplicate into primary (detection id)
 nrepo diff 42 57                 # Compare two ideas side-by-side
 nrepo merge 42 57 --force        # Manual merge if needed
 ```
