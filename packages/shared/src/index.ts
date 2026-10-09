@@ -11,7 +11,7 @@ import { z } from 'zod';
 
 export const IDEA_STATUSES = ['captured', 'exploring', 'building', 'shipped', 'shelved'] as const;
 export const IDEA_SOURCES = ['web', 'cli', 'claude-mcp', 'siri', 'email', 'api', 'shortcut', 'ios'] as const;
-export const LINK_TYPES = ['url', 'claude-chat', 'github-repo', 'github-issue', 'attachment'] as const;
+export const LINK_TYPES = ['url', 'claude-chat', 'github-repo', 'github-issue', 'github-pr', 'attachment'] as const;
 export const RELATION_TYPES = ['related', 'parent', 'blocks', 'inspires', 'duplicate', 'supersedes'] as const;
 export const DUPLICATE_STATUSES = ['pending', 'merged', 'dismissed'] as const;
 export const PLANS = ['free', 'pro'] as const;
@@ -96,6 +96,8 @@ export const UserSettingsSchema = z.object({
   stale_nudges: z.boolean().optional(),
   // Days before a "captured" idea counts as stale (digest flags + nudge emails)
   stale_threshold_days: z.number().int().min(7).max(180).optional(),
+  // Absent = off: status suggestions from GitHub (P5-07) wait in Review instead of being applied
+  github_auto_status: z.boolean().optional(),
 });
 
 export const DEFAULT_STALE_THRESHOLD_DAYS = 30;

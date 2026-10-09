@@ -352,7 +352,7 @@ import chalk3 from "chalk";
 import { z } from "zod";
 var IDEA_STATUSES = ["captured", "exploring", "building", "shipped", "shelved"];
 var IDEA_SOURCES = ["web", "cli", "claude-mcp", "siri", "email", "api", "shortcut", "ios"];
-var LINK_TYPES = ["url", "claude-chat", "github-repo", "github-issue", "attachment"];
+var LINK_TYPES = ["url", "claude-chat", "github-repo", "github-issue", "github-pr", "attachment"];
 var RELATION_TYPES = ["related", "parent", "blocks", "inspires", "duplicate", "supersedes"];
 var SOURCE_ICONS = {
   "claude-mcp": "\u25C8",
@@ -399,7 +399,9 @@ var UserSettingsSchema = z.object({
   // Absent = opted in; only an explicit false suppresses stale-idea nudge emails
   stale_nudges: z.boolean().optional(),
   // Days before a "captured" idea counts as stale (digest flags + nudge emails)
-  stale_threshold_days: z.number().int().min(7).max(180).optional()
+  stale_threshold_days: z.number().int().min(7).max(180).optional(),
+  // Absent = off: status suggestions from GitHub (P5-07) wait in Review instead of being applied
+  github_auto_status: z.boolean().optional()
 });
 var CreateIdeaSchema = z.object({
   title: z.string().min(1).max(LIMITS.IDEA_TITLE_MAX),
