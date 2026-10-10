@@ -403,7 +403,9 @@ var UserSettingsSchema = z.object({
   // Absent = off: status suggestions from GitHub (P5-07) wait in Review instead of being applied
   github_auto_status: z.boolean().optional(),
   // Absent = off: issues people open in connected repos are only matched to ideas, never imported (P5-13)
-  github_import_issues: z.boolean().optional()
+  github_import_issues: z.boolean().optional(),
+  // Set once the "Catch up from GitHub" banner was opened or dismissed (P5-22)
+  github_catch_up_seen: z.boolean().optional()
 });
 var CreateIdeaSchema = z.object({
   title: z.string().min(1).max(LIMITS.IDEA_TITLE_MAX),
