@@ -98,6 +98,8 @@ export const UserSettingsSchema = z.object({
   stale_threshold_days: z.number().int().min(7).max(180).optional(),
   // Absent = off: status suggestions from GitHub (P5-07) wait in Review instead of being applied
   github_auto_status: z.boolean().optional(),
+  // Absent = off: issues people open in connected repos are only matched to ideas, never imported (P5-13)
+  github_import_issues: z.boolean().optional(),
 });
 
 export const DEFAULT_STALE_THRESHOLD_DAYS = 30;
