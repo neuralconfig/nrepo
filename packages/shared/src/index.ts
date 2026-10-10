@@ -205,6 +205,8 @@ export interface ApiIdea {
   links?: ApiIdeaLink[];
   relations?: ApiIdeaRelation[];
   is_archived: number;
+  /** 1 while waiting in the Inbox (P5-04). */
+  is_suggested?: number;
   created_at: string;
   updated_at: string;
   processing?: boolean;
