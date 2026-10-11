@@ -85,62 +85,33 @@ async function loginWithBrowser(provider: LoginProvider): Promise<void> {
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NeuralRepo — Authenticated</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--green:#39ff14;--bg:#080808;--card:#0e0e0e;--border:#1a1a1a;--fg:#e2e0d8;--fg-mid:#666;--fg-dim:#3a3a3a}
+:root{--bg:#19191A;--card:#1E1E1F;--border:#2C2C2E;--text:#EEEEED;--soft:#B8B9BA;--mute:#949496;--repo:#EC7C46;--ok:#5BD39A}
+@media (prefers-color-scheme:light){:root{--bg:#FAFAF8;--card:#FFFFFF;--border:#E5E3DC;--text:#1A1D21;--soft:#454A52;--mute:#62666E;--repo:#A84A1C;--ok:#17704A}}
 html,body{height:100%}
-body{font-family:'IBM Plex Mono',monospace;background:var(--bg);color:var(--fg);display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden}
-body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 70% 60% at 50% 50%,rgba(57,255,20,.028) 0%,transparent 70%),repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(57,255,20,.018) 39px,rgba(57,255,20,.018) 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(57,255,20,.018) 39px,rgba(57,255,20,.018) 40px);pointer-events:none;z-index:0}
-body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 120% 120% at 50% 50%,transparent 40%,rgba(0,0,0,.82) 100%);pointer-events:none;z-index:0}
-.card{position:relative;z-index:1;width:360px;padding:48px 40px 40px;background:var(--card);border:1px solid var(--border);border-radius:12px;text-align:center;overflow:hidden;animation:fadein .4s ease both}
-.card::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.055),rgba(0,0,0,.055) 1px,transparent 1px,transparent 3px);pointer-events:none;z-index:20;border-radius:inherit}
-.card::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 40px rgba(57,255,20,.03);pointer-events:none;z-index:0}
-.wm{display:inline-flex;flex-direction:column;align-items:center;position:relative;margin-bottom:8px}
-.wm .wi{filter:drop-shadow(0 0 6px rgba(57,255,20,.75)) drop-shadow(0 0 16px rgba(57,255,20,.28)) drop-shadow(0 0 32px rgba(57,255,20,.10))}
-.wm .wt{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:500;color:var(--green);letter-spacing:-.4px;line-height:1;text-shadow:0 0 3px rgba(57,255,20,.9),0 0 12px rgba(57,255,20,.28),0 0 28px rgba(57,255,20,.10);margin-top:14px}
-.wm::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.04),rgba(0,0,0,.04) 1px,transparent 1px,transparent 4px);pointer-events:none;z-index:2;border-radius:2px}
-.status{font-size:11px;color:var(--fg-mid);letter-spacing:.5px;margin-bottom:28px;font-family:'IBM Plex Mono',monospace}
-.divider{display:flex;align-items:center;gap:10px;margin-bottom:20px}
-.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
-.divider span{font-size:9px;color:var(--fg-dim);letter-spacing:2px;text-transform:uppercase}
-.check{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:rgba(57,255,20,.06);border:1px solid rgba(57,255,20,.15);margin-bottom:16px}
-.check svg{width:20px;height:20px;color:var(--green);filter:drop-shadow(0 0 4px rgba(57,255,20,.5))}
-h1{font-family:'IBM Plex Sans',sans-serif;font-size:18px;font-weight:600;margin:0 0 8px;color:#fff}
-p{font-size:12px;color:var(--fg-dim);margin:0;font-family:'IBM Plex Mono',monospace;letter-spacing:.2px}
-@keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+body{font-family:'IBM Plex Sans',-apple-system,sans-serif;background:var(--bg);color:var(--text);display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.card{width:360px;max-width:100%;padding:40px 32px 36px;background:var(--card);border:1px solid var(--border);border-radius:14px;text-align:center;animation:fadein .3s ease both}
+.mark{width:56px;height:56px;margin:0 auto 14px;display:block}
+.wm{font-size:22px;font-weight:600;letter-spacing:-.035em;line-height:1;margin-bottom:28px}
+.wm span{color:var(--repo)}
+.label{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin-bottom:14px}
+.check{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;border:1px solid var(--border);margin-bottom:16px;color:var(--ok)}
+.check svg{width:20px;height:20px}
+h1{font-size:18px;font-weight:600;margin:0 0 6px}
+p{font-size:14px;color:var(--soft)}
+@keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){.card{animation:none}}
 </style></head>
 <body>
-<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
-  <symbol id="nn" viewBox="0 0 64 64" fill="none">
-    <line x1="14" y1="18" x2="32" y2="52" stroke="rgba(57,255,20,0.16)" stroke-width="1"/>
-    <line x1="14" y1="46" x2="32" y2="12" stroke="rgba(57,255,20,0.16)" stroke-width="1"/>
-    <line x1="32" y1="12" x2="50" y2="42" stroke="rgba(57,255,20,0.16)" stroke-width="1"/>
-    <line x1="32" y1="52" x2="50" y2="24" stroke="rgba(57,255,20,0.16)" stroke-width="1"/>
-    <line x1="14" y1="18" x2="32" y2="12" stroke="rgba(57,255,20,0.28)" stroke-width="1.5"/>
-    <line x1="14" y1="18" x2="32" y2="32" stroke="rgba(57,255,20,0.28)" stroke-width="1.5"/>
-    <line x1="14" y1="46" x2="32" y2="32" stroke="rgba(57,255,20,0.28)" stroke-width="1.5"/>
-    <line x1="14" y1="46" x2="32" y2="52" stroke="rgba(57,255,20,0.28)" stroke-width="1.5"/>
-    <line x1="32" y1="12" x2="50" y2="24" stroke="rgba(57,255,20,0.28)" stroke-width="1.5"/>
-    <line x1="32" y1="32" x2="50" y2="24" stroke="rgba(57,255,20,0.28)" stroke-width="1.5"/>
-    <line x1="32" y1="32" x2="50" y2="42" stroke="rgba(57,255,20,0.28)" stroke-width="1.5"/>
-    <line x1="32" y1="52" x2="50" y2="42" stroke="rgba(57,255,20,0.28)" stroke-width="1.5"/>
-    <circle cx="14" cy="18" r="5" fill="#39ff14"/>
-    <circle cx="14" cy="46" r="5" fill="#39ff14"/>
-    <circle cx="32" cy="12" r="3.5" fill="#39ff14" opacity=".72"/>
-    <circle cx="32" cy="32" r="5" fill="#39ff14"/>
-    <circle cx="32" cy="52" r="3.5" fill="#39ff14" opacity=".72"/>
-    <circle cx="50" cy="24" r="4.5" fill="#39ff14"/>
-    <circle cx="50" cy="42" r="4.5" fill="#39ff14"/>
-  </symbol>
-</svg>
 <div class="card">
-  <span class="wm">
-    <svg class="wi" width="72" height="72"><use href="#nn"/></svg>
-    <span class="wt">neuralrepo</span>
-  </span>
-  <div class="status">where ideas become code</div>
-  <div class="divider"><span>authenticated</span></div>
+  <picture>
+    <source srcset="https://neuralrepo.com/mark-light.svg" media="(prefers-color-scheme: light)">
+    <img class="mark" src="https://neuralrepo.com/mark.svg" alt="">
+  </picture>
+  <div class="wm">neural<span>repo</span></div>
+  <div class="label">Authenticated</div>
   <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
   <h1>You're in</h1>
   <p>Close this window and return to the terminal.</p>
